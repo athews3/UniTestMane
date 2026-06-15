@@ -1,0 +1,87 @@
+(* ================================================= *)
+(* Exit Cycle - Weight Preload - Close with Air Cyl  *)
+(* Structured Text - GX Works3 CORRECT version      *)
+(* ================================================= *)
+
+(* ------------------------- *)
+(* 1. Pre-Open Delay Timer T0 *)
+(* ------------------------- *)
+IF ( X0 AND (NOT X1) AND X17 AND (NOT M1) AND (NOT M2) AND M4 ) THEN
+    T0 := TRUE;
+ELSE
+    T0 := FALSE;
+END_IF;
+
+T0 := K10;
+
+
+(* ------------------------- *)
+(* 2. Push Open Latch (M101) *)
+(* ------------------------- *)
+IF ( T0 AND X17 AND (NOT M102) ) THEN
+    SET M101;
+END_IF;
+
+IF ( M102 OR (NOT X17) ) THEN
+    RST M101;
+END_IF;
+
+T1 := M101;
+T1 := K10;
+
+
+(* ------------------------- *)
+(* 3. Push Close Latch (M102) *)
+(* ------------------------- *)
+IF ( T1 AND X1 AND X17 AND (NOT M1) ) THEN
+    SET M102;
+END_IF;
+
+IF ( M1 OR (NOT X17) ) THEN
+    RST M102;
+END_IF;
+
+T2 := M102;
+T2 := K10;
+
+
+(* ------------------------- *)
+(* 4. Physical Outputs *)
+(* ------------------------- *)
+Y1 := M101;
+Y2 := M102;
+
+
+(* ------------------------- *)
+(* 5. Main Break + Cycle Count *)
+(* ------------------------- *)
+IF ( T2 AND X17 ) THEN
+    SET M1;
+    D200 := D200 + 1;
+END_IF;
+
+
+(* ------------------------- *)
+(* 6. Cycle Goal Detection *)
+(* ------------------------- *)
+IF ( D200 > D202 ) THEN
+    SET M2;
+END_IF;
+
+
+(* ------------------------- *)
+(* 7. Heartbeat Bit (M3) *)
+(* ------------------------- *)
+IF ( (NOT X17) AND FX5CPU.stSM.b1sClock ) THEN
+    SET M3;
+ELSE
+    RST M3;
+END_IF;
+
+
+(* ------------------------- *)
+(* 8. Reset Cycle Enable *)
+(* ------------------------- *)
+IF ( NOT X17 ) THEN
+    RST M4;
+END_IF;
