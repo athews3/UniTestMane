@@ -1,0 +1,109 @@
+(* ---------------- Initial Start Delay ---------------- *)
+tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4 AND NOT M5), PT := T#1s);
+
+
+(* ---------------- Open Door 1 ---------------- *)
+tOpen1(IN := ((tStartDelay.Q AND X17 AND X0 AND NOT M1) OR M20), PT := T#1s);
+
+IF tOpen1.Q THEN
+    M20 := TRUE;
+ELSE
+    IF NOT tStartDelay.Q THEN
+        M20 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Close Door 1 ---------------- *)
+tClose1(IN := ((tOpen1.Q AND NOT X0 AND X17 AND NOT M1) OR M21), PT := T#1s);
+
+IF tClose1.Q THEN
+    M21 := TRUE;
+ELSE
+    IF NOT tOpen1.Q THEN
+        M21 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- QEL Energize ---------------- *)
+tQEL(IN := ((tClose1.Q AND X17 AND X0 AND NOT M1) OR Y0), PT := T#1s);
+
+IF tQEL.Q THEN
+    Y0 := TRUE;
+ELSE
+    IF NOT tClose1.Q THEN
+        Y0 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Open Door 2 ---------------- *)
+tOpen2(IN := ((tQEL.Q AND X17 AND NOT M1) OR M32), PT := T#1s);
+
+IF tOpen2.Q THEN
+    M32 := TRUE;
+ELSE
+    IF NOT tQEL.Q THEN
+        M32 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Rising edge detect T5 ---------------- *)
+t5Rise := tOpen2.Q AND NOT prevT5;
+prevT5 := tOpen2.Q;
+
+
+(* ---------------- Counters ---------------- *)
+IF (t5Rise AND X17 AND NOT X0) THEN
+    D208 := D208 + 1;
+END_IF;
+
+IF (t5Rise AND X17 AND X0) THEN
+    D200 := D200 + 1;
+END_IF;
+
+
+(* ---------------- Close Door 2 ---------------- *)
+tClose2(IN := ((tOpen2.Q AND X17 AND NOT M1) OR M33), PT := T#1s);
+
+IF tClose2.Q THEN
+    M33 := TRUE;
+ELSE
+    IF NOT tOpen2.Q THEN
+        M33 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Outputs ---------------- *)
+Y1 := (M20 AND NOT M21) OR (M32 AND NOT M33);   (* Open door *)
+Y2 := (M21 AND NOT Y0) OR (M33 AND NOT M1);     (* Close door *)
+
+
+(* ---------------- Cycle Complete ---------------- *)
+IF (tClose2.Q AND X17) THEN
+    SET(M1);
+    D200 := D200 + 1;
+END_IF;
+
+
+(* ---------------- Goal Reached ---------------- *)
+IF (D200 > D202) THEN
+    SET(M2);
+END_IF;
+
+
+(* ---------------- Fail Limit ---------------- *)
+IF (D208 > 500) THEN
+    SET(M5);
+END_IF;
+
+
+(* ---------------- Heartbeat ---------------- *)
+IF (NOT X17 AND FX5CPU.stSM.b1sClock) THEN
+    SET(M3);
+ELSE
+    RST(M3);
+END_IF;
