@@ -1,0 +1,363 @@
+﻿.Label {
+	height: 1em;
+	width: 69px;
+	word-break: break-all;
+	overflow: hidden;
+	color: #FF00FF;
+}
+.Device {
+	width: 69px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: #4D4D4D;
+}
+
+.Operator {
+	width: 69px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: #4D4D4D;
+}
+
+.Statement {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.Note {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+body {
+	background: #FFFFFF;
+	color: #000000;
+}
+
+.comment {
+	word-break: break-all;
+	overflow: hidden;
+	color: #008000;
+}
+
+.NormalLayout .comment {
+	top: 63px;
+	left: 1px;
+	z-index: 3;
+	width: 69px;
+	height: 4em;
+	text-align: left;
+	position: absolute;
+}
+
+.CenterLayout .comment {
+	top: 3em;
+	left: 1px;
+	z-index: 3;
+	width: 69px;
+	height: 4em;
+	text-align: left;
+	position: absolute;
+}
+
+.VARIABLE .comment {
+	top: 3em;
+}
+
+.ARG .comment {
+	top: 2em;
+}
+
+.MCNESTNO .comment {
+	top: 4em;
+}
+
+.MCNAME .comment {
+	top: 4em;
+}
+
+.FbFunInput .comment {
+	position: absolute;
+	top: 3em;
+	left: 1px;
+	height: 4em;
+	width: 60px;
+	text-align: left;
+	overflow: hidden;
+	word-break: break-all;
+}
+
+.FbFunOutput .comment {
+	position: absolute;
+	top: 3em;
+	right: 1px;
+	height: 4em;
+	width: 60px;
+	text-align: left;
+	overflow: hidden;
+	word-break: break-all;
+}
+
+table {
+	border-collapse: collapse;
+	border: 1px #000000 solid;
+	font-family: Microsoft Sans Serif, tahoma, arial, sans-serif;
+	font-size: 22px;
+	line-height: 22px;
+	table-layout: fixed;
+	width: 69px;
+}
+
+tr {
+	border-style: dotted;
+	border-width: 1px;
+}
+td {
+	border-style: dotted;
+	border-width: 1px;
+	position: relative;
+	height: 187px;
+	width: 69px;
+	max-width: 69px;
+	padding: 0px;
+	overflow: hidden;
+}
+
+img {
+	position: absolute;
+	top: 0px;
+	left:0px;
+	z-index: 2;
+}
+
+.NormalLayout .Device {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 3;
+	width: 69px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.NormalLayout .Label {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 3;
+	width: 69px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.NormalLayout .Operator {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	z-index: 3;
+	width: 69px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.CenterLayout .Device {
+	position: absolute;
+	top: 22px;
+	left: 1px;
+	z-index: 3;
+	width: 69px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.CenterLayout .Label {
+	position: absolute;
+	top: 22px;
+	left: 5px;
+	z-index: 3;
+	width: 59px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.CenterLayout .Operator {
+	position: absolute;
+	top: 1em;
+	left: 1px;
+	z-index: 3;
+	width: 69px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.CenterLayout .Command {
+	position: absolute;
+	top: 22px;
+	left: 1px;
+	z-index: 3;
+	width: 69px;
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+.CenterLayout .step {
+	position: absolute;
+	top: 22px;
+	right: 1px;
+}
+
+.CenterLayout .step:before {
+	content: "(";
+}
+.CenterLayout .step:after {
+	content: ")";
+}
+
+.FbLayout {
+	border: 1px solid #000000;
+}
+.FunLayout {
+	border: 1px solid #000000;
+}
+
+.FbFunTitle {
+	height: 3em;
+	width: 136px;
+	text-align: center;
+	background-image: linear-gradient(0deg, #888888, #EFEFEF);
+	display: table;
+}
+
+.FbTitleLabel {
+	width: 69px;
+	display: table-cell;
+}
+
+.FbTitleType {
+	width: 69px;
+	display: table-cell;
+}
+
+.FbFunTitle div {
+	height: 1em;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.FbFunTitle .Label {
+	text-overflow: ellipsis;
+}
+
+.FbfunTitleName {
+	width: 136px;
+}
+
+.FbfunTitleName div {
+	text-align: left;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.FbFunArgument {
+	position: relative;
+	height: 188px;
+	width: 138px;
+	display: table;
+}
+
+.FbFunArgument .Label {
+	color: #000000;
+}
+.FbFunInput {
+	width: 68px;
+	display: table-cell;
+}
+
+.FbFunOutput {
+	width: 68px;
+	display: table-cell;
+}
+
+.FbVarPublic {
+	height: 188px;
+}
+
+.PublicLabel {
+	width: 69px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.PublicValue {
+	color: #0000FF;
+	width: 69px;
+	overflow: hidden;
+}
+.FbFunInput .Label {
+	position: absolute;
+	top: 22px;
+	left: 2px;
+	width: 60px;
+	text-align: left;
+}
+
+.FbFunOutput .Label {
+	position: absolute;
+	top: 22px;
+	right: 2px;
+	width: 60px;
+	text-align: right;
+}
+
+.FbFunDummyNote {
+	height: 1em;
+}
+
+.FbFunDummyNoteLine {
+	height: 2px;
+}
+
+.IstLayout {
+	overflow:scroll;
+	height: 185px;
+	width: 100%;
+	background: #fffafe;
+	border: 1px solid #000000;
+}
+
+.NoteLayout {
+	border: 1px solid #2e8b57;
+	height: 1em;
+	width: 100%;
+	background: #A0FFFF;
+	color: #000000;
+}
+
+.trNote td {
+	height: 1em;
+}
+
+.trFbFunTitle td{
+	height: 3em;
+}
+
+.trNote .step {
+	position: absolute;
+	top: 0px;
+	right: 1px;
+}
+
+.trInitial td {
+	height: 0px;
+}
+
