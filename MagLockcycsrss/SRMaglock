@@ -1,0 +1,103 @@
+(* ---------------- Start + Self-hold ---------------- *)
+tStart(IN := ((X0 AND X17 AND NOT M2 AND M4) OR M21) AND NOT M1, PT := T#1s);
+
+IF tStart.Q THEN
+    M21 := TRUE;
+ELSE
+    IF NOT X0 THEN
+        M21 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- AUX Output ---------------- *)
+tAux(IN := ((tStart.Q AND X17) OR Y1) AND NOT M22, PT := T#15s);
+
+IF tAux.Q THEN
+    Y1 := TRUE;
+ELSE
+    IF NOT tStart.Q THEN
+        Y1 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Latch stage ---------------- *)
+tLatch(IN := ((tAux.Q AND X17) OR M22) AND NOT M1, PT := T#1s);
+
+IF tLatch.Q THEN
+    M22 := TRUE;
+ELSE
+    IF NOT tAux.Q THEN
+        M22 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Reset Output ---------------- *)
+tReset(IN := ((tLatch.Q AND NOT X0 AND X17) OR Y2) AND NOT M20, PT := T#2s);
+
+IF tReset.Q THEN
+    Y2 := TRUE;
+ELSE
+    IF NOT tLatch.Q THEN
+        Y2 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Main Hold ---------------- *)
+tHold(IN := ((tReset.Q AND X17) OR M20) AND NOT M1, PT := T#20s);
+
+IF tHold.Q THEN
+    M20 := TRUE;
+ELSE
+    IF NOT tReset.Q THEN
+        M20 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Key Actuator ---------------- *)
+tKey(IN := ((tHold.Q AND X17) OR Y0) AND NOT M23, PT := T#2s);
+
+IF tKey.Q THEN
+    Y0 := TRUE;
+ELSE
+    IF NOT tHold.Q THEN
+        Y0 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Final latch ---------------- *)
+tFinalize(IN := ((tKey.Q AND X17) OR M23) AND NOT M1, PT := T#2s);
+
+IF tFinalize.Q THEN
+    M23 := TRUE;
+ELSE
+    IF NOT tKey.Q THEN
+        M23 := FALSE;
+    END_IF;
+END_IF;
+
+
+(* ---------------- Cycle Complete ---------------- *)
+IF (tFinalize.Q AND X0) THEN
+    SET(M1);
+    CycleCount := CycleCount + 1;
+END_IF;
+
+
+(* ---------------- Goal Reached ---------------- *)
+IF (CycleCount > CycleTarget) THEN
+    SET(M2);
+END_IF;
+
+
+(* ---------------- Heartbeat ---------------- *)
+IF (NOT X17 AND FX5CPU.stSM.b1sClock) THEN
+    SET(M3);
+ELSE
+    RST(M3);
+END_IF;
