@@ -1,0 +1,78 @@
+
+
+(* ---------------- Test Change Handling ---------------- *)
+IF (D100 <> LastTest) THEN
+    RST(M4);        (* FORCE STOP *)
+    RST(M1);
+    RST(M2);
+    D200 := 0;
+END_IF;
+
+LastTest := D100;
+
+
+(* ---------------- Start (edge-triggered) ---------------- *)
+IF (M200 AND NOT PrevStart) THEN
+    SET(M4);
+END_IF;
+
+PrevStart := M200;
+
+
+(* ---------------- Stop ---------------- *)
+IF M201 THEN
+    RST(M4);
+END_IF;
+
+
+(* ---------------- Reset ---------------- *)
+IF M202 THEN
+    RST(M4);
+    RST(M1);
+    RST(M2);
+    D200 := 0;
+END_IF;
+
+
+(* ---------------- Status ---------------- *)
+M211 := M4 AND (NOT M2);
+M212 := M2;
+
+
+(* ---------------- Default Outputs ---------------- *)
+Y0 := FALSE;
+Y1 := FALSE;
+Y2 := FALSE;
+
+
+(* ---------------- Test Execution ---------------- *)
+IF M4 AND (NOT M2) THEN
+
+    CASE D100 OF
+
+        1:
+		TrimInst();
+
+        2:
+		ExitAirInst();
+
+        3:
+		ExitCloserInst();
+		
+		
+
+    END_CASE;
+    
+	IF PrevM1 THEN
+			RST(M1);
+	END_IF;
+	
+	PrevM1 := M1;
+	(* ---------- Heartbeat ---------- *)
+	IF ( (NOT X17) AND FX5CPU.stSM.b1sClock ) THEN
+		SET(M3);
+		ELSE
+		RST(M3);
+	END_IF;
+END_IF;
+
