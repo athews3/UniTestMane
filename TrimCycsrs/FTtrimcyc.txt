@@ -1,0 +1,33 @@
+(* Pre-delay *)
+tPreDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2), PT := K50);
+
+preDelayDone := tPreDelay.Q;
+
+
+(* Valve timing *)
+tValve(IN := preDelayDone, PT := K50);
+
+valveActive := tValve.Q;
+
+
+IF valveActive THEN
+    Y0 := TRUE;
+END_IF;
+
+
+(* Edge detection *)
+x0Fall := (NOT X0) AND prevX0;
+prevX0 := X0;
+
+
+(* Cycle complete *)
+IF (valveActive AND x0Fall) THEN
+    SET(M1);
+    D200 := D200 + 1;
+END_IF;
+
+
+(* Goal reached *)
+IF (D200 >= D202) THEN
+    SET(M2);
+END_IF;
