@@ -90,7 +90,7 @@ END_IF;
 
 
 (* ---------------- Goal Reached ---------------- *)
-IF (CycleCount > CycleTarget) THEN
+IF (CycleCount > CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
 END_IF;
 
