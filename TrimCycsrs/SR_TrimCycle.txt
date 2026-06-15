@@ -12,6 +12,8 @@ valveActive := tValve.Q;
 
 IF valveActive THEN
     Y0 := TRUE;
+ELSE
+    Y0 := FALSE;
 END_IF;
 
 
