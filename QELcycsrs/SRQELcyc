@@ -40,7 +40,7 @@ END_IF;
 (* ---------------- Fail Counter ---------------- *)
 IF (tFailRetract.Q AND X17 AND NOT M9) THEN
     M16 := TRUE;
-    D208 := D208 + 1;
+    FailtoRet := FailtoRet + 1;
 ELSE
     M16 := FALSE;
 END_IF;
@@ -85,12 +85,12 @@ IF (tReengage.Q AND X17) THEN
 END_IF;
 
 (* ---------------- Goal Reached ---------------- *)
-IF (D200 > D202) THEN
+IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
 END_IF;
 
 (* ---------------- Fail Limit ---------------- *)
-IF (D208 > 500) THEN
+IF (FailtoRet > 500) THEN
     SET(M5);
 END_IF;
 
