@@ -25,11 +25,11 @@ prevX0 := X0;
 (* Cycle complete *)
 IF (tValve.Q AND (NOT X0)) THEN
     SET(M1);
-    D200 := D200 + 1;
+    CycleCount := CycleCount + 1;
 END_IF;
 
 
 (* Goal reached *)
-IF (D200 >= D202) THEN
+IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
 END_IF;
