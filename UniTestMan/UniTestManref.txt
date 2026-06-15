@@ -59,7 +59,8 @@ IF M4 AND (NOT M2) THEN
         3:
 		ExitCloserInst();
 		
-		
+		4:
+		QELInst();
 
     END_CASE;
     
