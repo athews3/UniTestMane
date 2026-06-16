@@ -61,6 +61,12 @@ IF M4 AND (NOT M2) THEN
 		
 		4:
 		QELInst();
+		
+		5:
+		ChexitInst();
+		
+		6:
+		MagLockInst();
 
     END_CASE;
     
