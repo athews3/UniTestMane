@@ -1,9 +1,9 @@
 (* Pre-open delay with self-hold *)
-tPreDelay(IN := ((tPreDelay.Q OR X0) AND NOT X1 AND X17 AND NOT M1 AND NOT M2), PT := T#1.5s);
+tPreDelay(IN := ((tPreDelay.Q OR X0) AND NOT X1 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1.5s);
 
 
 (* OPEN -ends when tCloseHold duration ends *)
-IF (tPreDelay.Q AND X17 AND NOT mClose AND NOT X1) THEN
+IF (tPreDelay.Q AND X17 AND NOT mClose AND NOT X1 AND M4) THEN
     mOpen := TRUE;
 ELSE
 	mOpen := FALSE;
@@ -12,7 +12,7 @@ END_IF;
 tCloseHold(IN := X1, PT :=T#750ms);
 
 (* CLOSE (corrected: no coexistence & tied to tCloseHold *)
-IF (tCloseHold.Q AND X17) THEN
+IF (tCloseHold.Q AND X17 AND M4) THEN
     mClose := TRUE;
 ELSE
 	mClose := FALSE;
@@ -24,16 +24,12 @@ Y2 := mClose;
 
 
 (* Cycle complete  *)
-IF (mClose AND NOT prevClose AND X17) THEN
+IF (mClose AND NOT prevClose AND X17 AND M4) THEN
     SET(M1);
     CycleCount := CycleCount + 1;
 END_IF;
 
 PrevClose := mClose;
-
-IF (M1 AND NOT mClose) THEN
-		RST(M1);
-END_IF;
 
 (* Goal reached *)
 IF (CycleCount >= CycleTarget) AND (CycleTarget > 0)THEN
