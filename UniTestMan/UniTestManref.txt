@@ -1,108 +1,161 @@
-(* ---------------- TEST CHANGE ---------------- *)
-IF (D100 <> LastTest) THEN
-    RST(M4);
-    RST(M1);
-    RST(M2);
-    RST(M205);
-    D200 := 0;
+(* ===================================================== *)
+(* ---------------- TEST CHANGE ------------------------- *)
+(* ===================================================== *)
+IF (HMI_SelectedTest <> LastTest) THEN
+
+    (* --- stop execution --- *)
+    RST(Run_Latch);
+
+    (* --- reset core state --- *)
+    RST(Cycle_Complete);
+    RST(Goal_Reached);
+    RST(Internal_Stop);
+
+    (* --- reset pause --- *)
+    RST(Paused_Latch);
+
+    (* --- reset counters --- *)
+    CycleCount := 0;
+    FailtoRet := 0;
+
+    (* -------- MEMORY CONTAMINATION CONTROL -------- *)
+    RST(M20); RST(M21);
+    RST(M22); RST(M23);
+    RST(M32); RST(M33);
+
+    RST(M6);  RST(M7);
+    RST(M8);  RST(M9);
+    RST(M10); RST(M16);
+
 END_IF;
 
-LastTest := D100;
+LastTest := HMI_SelectedTest;
 
 
-(* ---------------- START ---------------- *)
-IF (M200 AND NOT PrevStart AND NOT M210 AND NOT M2 AND X17) THEN
-    SET(M4);
-    RST(M205);
-END_IF;
-PrevStart := M200;
-
-
-(* ---------------- STOP ---------------- *)
-IF M201 THEN
-    RST(M4);
-    RST(M210);
-    SET(M205);
+(* ===================================================== *)
+(* ---------------- START (EDGE) ------------------------ *)
+(* ===================================================== *)
+IF (HMI_Start AND NOT PrevStart AND NOT Paused_Latch AND NOT Goal_Reached AND X17) THEN
+    SET(Run_Latch);
+    RST(Internal_Stop);
 END_IF;
 
+PrevStart := HMI_Start;
 
-(* ---------------- RESET ---------------- *)
-IF M202 THEN
-    RST(M4);
-    RST(M1);
-    RST(M2);
-    RST(M210);
-    RST(M205);
-    D200 := 0;
+
+(* ===================================================== *)
+(* ---------------- STOP ------------------------------- *)
+(* ===================================================== *)
+IF HMI_Stop THEN
+    RST(Run_Latch);
+    RST(Paused_Latch);
+    SET(Internal_Stop);
 END_IF;
 
 
-(* ---------------- PAUSE ---------------- *)
-IF (M210_CMD AND NOT M210) THEN
-    SET(M210);
-    RST(M4);
+(* ===================================================== *)
+(* ---------------- RESET ------------------------------ *)
+(* ===================================================== *)
+IF HMI_Reset THEN
+    RST(Run_Latch);
+    RST(Cycle_Complete);
+    RST(Goal_Reached);
+    RST(Paused_Latch);
+    RST(Internal_Stop);
+
+    CycleCount := 0;
+    FailtoRet := 0;
 END_IF;
 
-IF (M211_CMD AND M210 AND NOT M2 AND X17) THEN
-    RST(M210);
-    SET(M4);
+
+(* ===================================================== *)
+(* ---------------- PAUSE / RESUME --------------------- *)
+(* ===================================================== *)
+IF (Pause_CMD AND NOT Paused_Latch) THEN
+    SET(Paused_Latch);
+    RST(Run_Latch);
+END_IF;
+
+IF (Resume_CMD AND Paused_Latch AND NOT Goal_Reached AND X17) THEN
+    RST(Paused_Latch);
+    SET(Run_Latch);
 END_IF;
 
 
-(* ---------------- INTERLOCK ---------------- *)
+(* ===================================================== *)
+(* ---------------- INTERLOCK -------------------------- *)
+(* ===================================================== *)
 IF NOT X17 THEN
-    RST(M4);
-    SET(M205);
+    RST(Run_Latch);
+    SET(Internal_Stop);
 END_IF;
 
 
-(* ---------------- RESERVATION ---------------- *)
-IF (M220_CMD AND NOT M220) THEN
-    D300 := D110;                      (* initials *)
-    D301 := SD520 + 3600;
-    SET(M220);
+(* ===================================================== *)
+(* ---------------- RESERVATION ------------------------ *)
+(* ===================================================== *)
+IF (Reserve_CMD AND NOT Reserved_Latch) THEN
+    TechnicianInitials := HMI_Initials;   (* labeled, not raw D *)
+    ReservationExpiry  := SD520 + 3600;
+    SET(Reserved_Latch);
 END_IF;
 
-IF M221_CMD THEN
-    RST(M220);
-    D300 := 0;
+IF ClearReserve_CMD THEN
+    RST(Reserved_Latch);
+    TechnicianInitials := 0;
 END_IF;
 
-IF (M220 AND SD520 > D301) THEN
-    RST(M220);
-    D300 := 0;
+IF (Reserved_Latch AND SD520 > ReservationExpiry) THEN
+    RST(Reserved_Latch);
+    TechnicianInitials := 0;
 END_IF;
 
 
-(* ---------------- EXECUTION ---------------- *)
-IF (M4 AND NOT M2 AND NOT M210) THEN
+(* ===================================================== *)
+(* ---------------- EXECUTION -------------------------- *)
+(* ===================================================== *)
+IF (Run_Latch AND NOT Goal_Reached AND NOT Paused_Latch) THEN
 
-    CASE D100 OF
+    CASE HMI_SelectedTest OF
         1: TrimInst();
         2: ExitAirInst();
         3: ExitCloserInst();
         4: QELInst();
-        5: MaglockInst();
+        5: MagLockInst();
         6: ChexitInst();
     END_CASE;
 
 END_IF;
 
 
-(* ---------------- COMPLETION ---------------- *)
-IF M2 THEN
-    RST(M4);
-    SET(M205);
+(* ===================================================== *)
+(* ---------------- COMPLETION ------------------------- *)
+(* ===================================================== *)
+IF Goal_Reached THEN
+    RST(Run_Latch);
+    SET(Internal_Stop);
 END_IF;
 
 
-(* ---------------- DERIVED STATES ---------------- *)
-M300 := M4 AND NOT M2;
-M301 := M210;
-M303 := M220;
+(* ===================================================== *)
+(* ---------------- DERIVED STATES --------------------- *)
+(* ===================================================== *)
 
-M302 :=
-    (NOT M4)
-    AND (NOT M210)
-    AND (NOT M2)
-    AND (M205 OR NOT X17);
+Running_State := Run_Latch AND NOT Goal_Reached;
+Paused_State  := Paused_Latch;
+Reserved_State := Reserved_Latch;
+
+Idle_State :=
+    (NOT Run_Latch)
+    AND (NOT Paused_Latch)
+    AND (NOT Goal_Reached)
+    AND (Internal_Stop OR NOT X17);
+
+
+(* ===================================================== *)
+(* ---------------- HMI LAMPS -------------------------- *)
+(* ===================================================== *)
+
+Test_Running  := Running_State;
+Test_Complete := Goal_Reached;
+Test_Ready    := Idle_State;
