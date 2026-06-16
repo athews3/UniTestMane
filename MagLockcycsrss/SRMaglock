@@ -1,5 +1,5 @@
 (* ---------------- Start + Self-hold ---------------- *)
-tStart(IN := ((X0 AND X17 AND NOT M2 AND M4) OR M21) AND NOT M1, PT := T#1s);
+tStart(IN := ((X0 AND X17 AND NOT M2 AND M4) OR M21) AND NOT M1 AND M4, PT := T#1s);
 
 IF tStart.Q THEN
     M21 := TRUE;
@@ -11,7 +11,7 @@ END_IF;
 
 
 (* ---------------- AUX Output ---------------- *)
-tAux(IN := ((tStart.Q AND X17) OR Y1) AND NOT M22, PT := T#15s);
+tAux(IN := ((tStart.Q AND X17) OR Y1) AND NOT M22 AND M4, PT := T#15s);
 
 IF tAux.Q THEN
     Y1 := TRUE;
@@ -23,7 +23,7 @@ END_IF;
 
 
 (* ---------------- Latch stage ---------------- *)
-tLatch(IN := ((tAux.Q AND X17) OR M22) AND NOT M1, PT := T#1s);
+tLatch(IN := ((tAux.Q AND X17) OR M22) AND NOT M1 AND M4, PT := T#1s);
 
 IF tLatch.Q THEN
     M22 := TRUE;
@@ -35,7 +35,7 @@ END_IF;
 
 
 (* ---------------- Reset Output ---------------- *)
-tReset(IN := ((tLatch.Q AND NOT X0 AND X17) OR Y2) AND NOT M20, PT := T#2s);
+tReset(IN := ((tLatch.Q AND NOT X0 AND X17) OR Y2) AND NOT M20 AND M4, PT := T#2s);
 
 IF tReset.Q THEN
     Y2 := TRUE;
@@ -47,7 +47,7 @@ END_IF;
 
 
 (* ---------------- Main Hold ---------------- *)
-tHold(IN := ((tReset.Q AND X17) OR M20) AND NOT M1, PT := T#20s);
+tHold(IN := ((tReset.Q AND X17) OR M20) AND NOT M1 AND M4, PT := T#20s);
 
 IF tHold.Q THEN
     M20 := TRUE;
@@ -59,7 +59,7 @@ END_IF;
 
 
 (* ---------------- Key Actuator ---------------- *)
-tKey(IN := ((tHold.Q AND X17) OR Y0) AND NOT M23, PT := T#2s);
+tKey(IN := ((tHold.Q AND X17) OR Y0) AND NOT M23 AND M4, PT := T#2s);
 
 IF tKey.Q THEN
     Y0 := TRUE;
@@ -71,7 +71,7 @@ END_IF;
 
 
 (* ---------------- Final latch ---------------- *)
-tFinalize(IN := ((tKey.Q AND X17) OR M23) AND NOT M1, PT := T#2s);
+tFinalize(IN := ((tKey.Q AND X17) OR M23) AND NOT M1 AND M4, PT := T#2s);
 
 IF tFinalize.Q THEN
     M23 := TRUE;
@@ -83,7 +83,7 @@ END_IF;
 
 
 (* ---------------- Cycle Complete ---------------- *)
-IF (tFinalize.Q AND X0) THEN
+IF (tFinalize.Q AND X0 AND M4) THEN
     SET(M1);
     CycleCount := CycleCount + 1;
 END_IF;
@@ -92,12 +92,4 @@ END_IF;
 (* ---------------- Goal Reached ---------------- *)
 IF (CycleCount > CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
-END_IF;
-
-
-(* ---------------- Heartbeat ---------------- *)
-IF (NOT X17 AND FX5CPU.stSM.b1sClock) THEN
-    SET(M3);
-ELSE
-    RST(M3);
 END_IF;
