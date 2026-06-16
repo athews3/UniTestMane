@@ -1,22 +1,22 @@
 (* ---------------- Precondition / Start Delay ---------------- *)
-tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4 AND NOT M5), PT := T#1s);
+tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4 AND NOT M5 AND M4), PT := T#1s);
 
 (* ---------------- Pushbar / Unpowered State ---------------- *)
-IF (M6 AND NOT M7 AND X17) THEN
+IF (M6 AND NOT M7 AND X17 AND M4) THEN
     Y1 := TRUE;   (* Pushbar *)
 ELSE
     Y1 := FALSE;
 END_IF;
 
 (* ---------------- QEL Output ---------------- *)
-IF (M8 AND NOT M6 AND X17) THEN
+IF (M8 AND NOT M6 AND X17 AND M4) THEN
     Y0 := TRUE;   (* QEL *)
 ELSE
     Y0 := FALSE;
 END_IF;
 
 (* ---------------- Power Enable + Hold ---------------- *)
-tPowerHold(IN := ((tStartDelay.Q AND X17 AND NOT M9 AND NOT M1) OR M8), PT := T#800ms);
+tPowerHold(IN := ((tStartDelay.Q AND X17 AND NOT M9 AND NOT M1) OR M8 AND M4), PT := T#800ms);
 
 IF (tPowerHold.Q) THEN
     M8 := TRUE;
@@ -27,7 +27,7 @@ ELSE
 END_IF;
 
 (* ---------------- Fail-to-Retract Detection ---------------- *)
-tFailRetract(IN := ((Y0 AND X0 AND X17 AND tPowerHold.Q AND NOT M1) OR M10), PT := T#2s);
+tFailRetract(IN := ((Y0 AND X0 AND X17 AND tPowerHold.Q AND NOT M1) OR M10 AND M4), PT := T#2s);
 
 IF (tFailRetract.Q) THEN
     M10 := TRUE;
@@ -38,7 +38,7 @@ ELSE
 END_IF;
 
 (* ---------------- Fail Counter ---------------- *)
-IF (tFailRetract.Q AND X17 AND NOT M9) THEN
+IF (tFailRetract.Q AND X17 AND NOT M9 AND M4) THEN
     M16 := TRUE;
     FailtoRet := FailtoRet + 1;
 ELSE
@@ -46,7 +46,7 @@ ELSE
 END_IF;
 
 (* ---------------- Power Break ---------------- *)
-tPowerBreak(IN := (((tPowerHold.Q AND X17 AND NOT X0 AND NOT M1) OR M9) OR (tFailRetract.Q AND M16)), PT := T#800ms);
+tPowerBreak(IN := (((tPowerHold.Q AND X17 AND NOT X0 AND NOT M1) OR M9) OR (tFailRetract.Q AND M16) AND M4), PT := T#800ms);
 
 IF (tPowerBreak.Q) THEN
     M9 := TRUE;
@@ -57,7 +57,7 @@ ELSE
 END_IF;
 
 (* ---------------- Unpowered Pushbar ---------------- *)
-tUnpowered(IN := ((tPowerBreak.Q AND X17 AND NOT M1) OR M6), PT := T#800ms);
+tUnpowered(IN := ((tPowerBreak.Q AND X17 AND NOT M1) OR M6 AND M4), PT := T#800ms);
 
 IF (tUnpowered.Q) THEN
     M6 := TRUE;
@@ -68,7 +68,7 @@ ELSE
 END_IF;
 
 (* ---------------- Re-engage ---------------- *)
-tReengage(IN := ((tUnpowered.Q AND X0 AND X17 AND NOT M1) OR M7), PT := T#800ms);
+tReengage(IN := ((tUnpowered.Q AND X0 AND X17 AND NOT M1) OR M7 AND M4), PT := T#800ms);
 
 IF (tReengage.Q) THEN
     M7 := TRUE;
@@ -79,7 +79,7 @@ ELSE
 END_IF;
 
 (* ---------------- Cycle Complete ---------------- *)
-IF (tReengage.Q AND X17) THEN
+IF (tReengage.Q AND X17 AND M4) THEN
     SET(M1);
     D200 := D200 + 1;
 END_IF;
@@ -92,11 +92,4 @@ END_IF;
 (* ---------------- Fail Limit ---------------- *)
 IF (FailtoRet > 500) THEN
     SET(M5);
-END_IF;
-
-(* ---------------- Heartbeat ---------------- *)
-IF (NOT X17 AND FX5CPU.stSM.b1sClock) THEN
-    SET(M3);
-ELSE
-    RST(M3);
 END_IF;
