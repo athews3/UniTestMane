@@ -8,11 +8,11 @@ END_IF;
 T0_PT := K10;
 
 (* 2. Pushbar OPEN latch (M101 → Y1) *)
-IF ( T0 AND X17 AND (NOT M102) ) THEN
+IF ( T0 AND X17 AND (NOT M102) AND M4) THEN
     SET(M101);
 END_IF;
 
-IF ( M102 OR (NOT X17) ) THEN
+IF ( M102 OR (NOT X17) AND M4) THEN
     RST(M101);
 END_IF;
 
@@ -20,11 +20,11 @@ T1 := M101;
 T1_PT := K4;
 
 (* 3. CLOSE with closer latch (M102 → Y2) *)
-IF ( T1 AND X1 AND X17 AND (NOT M1) ) THEN
+IF ( T1 AND X1 AND X17 AND (NOT M1) AND M4) THEN
     SET(M102);
 END_IF;
 
-IF ( M1 OR (NOT X17) ) THEN
+IF ( M1 OR (NOT X17) AND M4) THEN
     RST(M102);
 END_IF;
 
@@ -38,7 +38,7 @@ Y2 := M102;
 
 
 (* Main Break + Cycle Count *)
-IF ( T2 AND X17 ) THEN
+IF ( T2 AND X17 AND M4) THEN
     SET(M1);
     CycleTarget := CycleTarget + 1;
 END_IF;
@@ -47,22 +47,4 @@ END_IF;
 (* Goal reached *)
 IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
-END_IF;
-
-
-(* ------------------------- *)
-(* 7. Heartbeat Bit *)
-(* ------------------------- *)
-IF ( (NOT X17) AND FX5CPU.stSM.b1sClock ) THEN
-    SET(M3);
-ELSE
-    RST(M3);
-END_IF;
-
-
-(* ------------------------- *)
-(* 8. Reset Start/Stop Enable *)
-(* ------------------------- *)
-IF ( NOT X17 ) THEN
-    RST(M4);
 END_IF;
