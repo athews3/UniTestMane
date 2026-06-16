@@ -71,12 +71,21 @@ END_IF;
 (* ===================================================== *)
 (* ---------------- PAUSE / RESUME --------------------- *)
 (* ===================================================== *)
-IF (Pause_CMD AND NOT Paused_Latch) THEN
+
+(*Keep pause/resume latch actuated when button is released*)
+
+Pause_Rise := (HMI_Pause AND NOT PrevPause);
+Resume_Rise := (HMI_Resume AND NOT PrevResume);
+
+PrevPause := HMI_Pause;
+PrevResume := HMI_Resume;
+
+IF (Pause_Rise AND NOT Paused_Latch) THEN
     SET(Paused_Latch);
     RST(Run_Latch);
 END_IF;
 
-IF (Resume_CMD AND Paused_Latch AND NOT Goal_Reached AND X17) THEN
+IF (Resume_Rise AND Paused_Latch AND NOT Goal_Reached AND X17) THEN
     RST(Paused_Latch);
     SET(Run_Latch);
 END_IF;
@@ -95,7 +104,7 @@ END_IF;
 (* ---------------- RESERVATION ------------------------ *)
 (* ===================================================== *)
 IF (Reserve_CMD AND NOT Reserved_Latch) THEN
-    TechnicianInitials := HMI_Initials;   (* labeled, not raw D *)
+    TechnicianInitials := HMI_Init; 
     ReservationExpiry  := SD520 + 3600;
     SET(Reserved_Latch);
 END_IF;
@@ -146,10 +155,10 @@ Paused_State  := Paused_Latch;
 Reserved_State := Reserved_Latch;
 
 Idle_State :=
-    (NOT Run_Latch)
-    AND (NOT Paused_Latch)
-    AND (NOT Goal_Reached)
-    AND (Internal_Stop OR NOT X17);
+(NOT Run_Latch)
+AND (NOT Paused_Latch)
+AND (NOT Goal_Reached)
+AND (Internal_Stop OR NOT X17);
 
 
 (* ===================================================== *)
