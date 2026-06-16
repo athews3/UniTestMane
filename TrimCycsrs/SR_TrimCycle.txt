@@ -1,11 +1,11 @@
 (* Pre-delay *)
-tPreDelay(IN := ((X0 OR tPreDelay.Q) AND X17 AND NOT M1 AND NOT M2), PT := T#5s);
+tPreDelay(IN := ((X0 OR tPreDelay.Q) AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#5s);
 
 preDelayDone := tPreDelay.Q;
 
 
 (* Valve timing *)
-tValve(IN := ((tPreDelay.Q or tValve.Q) AND X17 AND NOT M1), PT := T#5s);
+tValve(IN := ((tPreDelay.Q or tValve.Q) AND X17 AND NOT M1 AND M4), PT := T#5s);
 
 valveActive := tValve.Q;
 
