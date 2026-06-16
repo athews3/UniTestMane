@@ -1,50 +1,53 @@
-(* 1. Pre-Open Delay (T0) *)
-IF ( X0 AND (NOT X1) AND X17 AND (NOT M1) AND (NOT M2) AND M4 ) THEN
-    T0 := TRUE;
+(* ---------------- Pre-Open Delay ---------------- *)
+tPreDelay(
+    IN := (X0 AND NOT X1 AND X17 AND NOT M1 AND NOT M2 AND M4),
+    PT := T#1s
+);
+
+
+(* ---------------- Pushbar OPEN ---------------- *)
+tOpenHold(
+    IN := ((tPreDelay.Q AND X17 AND NOT M102 AND M4) OR M101),
+    PT := T#400ms
+);
+
+IF (tOpenHold.Q AND M4) THEN
+    M101 := TRUE;
 ELSE
-    T0 := FALSE;
+    IF (NOT tPreDelay.Q OR NOT M4 OR M102) THEN
+        M101 := FALSE;
+    END_IF;
 END_IF;
 
-T0_PT := K10;
 
-(* 2. Pushbar OPEN latch (M101 → Y1) *)
-IF ( T0 AND X17 AND (NOT M102) AND M4) THEN
-    SET(M101);
+(* ---------------- CLOSE (Closer Action) ---------------- *)
+tCloseHold(
+    IN := ((M101 AND X1 AND X17 AND NOT M1 AND M4) OR M102),
+    PT := T#2.3s
+);
+
+IF (tCloseHold.Q AND M4) THEN
+    M102 := TRUE;
+ELSE
+    IF (NOT M101 OR NOT M4) THEN
+        M102 := FALSE;
+    END_IF;
 END_IF;
 
-IF ( M102 OR (NOT X17) AND M4) THEN
-    RST(M101);
-END_IF;
 
-T1 := M101;
-T1_PT := K4;
-
-(* 3. CLOSE with closer latch (M102 → Y2) *)
-IF ( T1 AND X1 AND X17 AND (NOT M1) AND M4) THEN
-    SET(M102);
-END_IF;
-
-IF ( M1 OR (NOT X17) AND M4) THEN
-    RST(M102);
-END_IF;
-
-T2 := M102;
-T2_PT := K23;
-
-(* 4. Physical Outputs *)
-
+(* ---------------- Outputs ---------------- *)
 Y1 := M101;
 Y2 := M102;
 
 
-(* Main Break + Cycle Count *)
-IF ( T2 AND X17 AND M4) THEN
+(* ---------------- Cycle Complete ---------------- *)
+IF (tCloseHold.Q AND X17 AND M4) THEN
     SET(M1);
-    CycleTarget := CycleTarget + 1;
+    CycleCount := CycleCount + 1;
 END_IF;
 
 
-(* Goal reached *)
+(* ---------------- Goal Reached ---------------- *)
 IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
 END_IF;
