@@ -104,34 +104,32 @@ END_IF;
 (* ---------------- RESERVATION ------------------------- *)
 (* ===================================================== *)
 
-(* --- Timer ALWAYS executes --- *)
+(* --- Timer ALWAYS executes (observer only) --- *)
 ReserveTimer(
     IN := Reserved_Latch,
-    PT := T#1H
+    PT := T#5H
 );
 
 
-(* --- State control with priority --- *)
-IF ClearReserve_CMD THEN
-
-    (* Highest priority: manual clear *)
-    RST(Reserved_Latch);
-    TechnicianInitials := 0;
-
-ELSIF (ReserveTimer.Q AND Reserved_Latch) THEN
-
-    (* Second: automatic expiration *)
-    RST(Reserved_Latch);
-    TechnicianInitials := 0;
-
-ELSIF (Reserve_CMD AND NOT Reserved_Latch) THEN
-
-    (* Lowest: new reservation *)
-    TechnicianInitials := HMI_Init;
+(* --- Reserve (unchanged core behavior) --- *)
+IF (Reserve_CMD AND NOT Reserved_Latch) THEN
+    TechnInit := HMI_Init;
     SET(Reserved_Latch);
-
 END_IF;
 
+
+(* --- Clear (unchanged priority behavior) --- *)
+IF ClearReserve_CMD THEN
+    RST(Reserved_Latch);
+    TechnInit := 0;
+END_IF;
+
+
+(* --- Expiration (adds capability, does not interfere with set) --- *)
+IF (Reserved_Latch AND ReserveTimer.Q) THEN
+    RST(Reserved_Latch);
+    TechInit := 0;
+END_IF;
 (* ===================================================== *)
 (* ---------------- EXECUTION -------------------------- *)
 (* ===================================================== *)
