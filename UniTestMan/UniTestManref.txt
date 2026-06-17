@@ -104,34 +104,33 @@ END_IF;
 (* ---------------- RESERVATION ------------------------- *)
 (* ===================================================== *)
 
-(* --- Reserve (one-shot latch) --- *)
-IF (Reserve_CMD AND NOT Reserved_Latch) THEN
-    TechInit := HMI_Init;
-    SET(Reserved_Latch);
-END_IF;
+(* --- Timer ALWAYS executes --- *)
+ReserveTimer(
+    IN := Reserved_Latch,
+    PT := T#1H
+);
 
 
-(* --- Reservation timer (1 hour) --- *)
-IF Reserved_Latch THEN
-    ReserveTimer(IN := TRUE, PT := T#5H);
-ELSE
-    ReserveTimer(IN := FALSE);
-END_IF;
-
-
-(* --- Clear command --- *)
+(* --- State control with priority --- *)
 IF ClearReserve_CMD THEN
+
+    (* Highest priority: manual clear *)
     RST(Reserved_Latch);
-    TechnInit := 0;
-END_IF;
+    TechnicianInitials := 0;
 
+ELSIF (ReserveTimer.Q AND Reserved_Latch) THEN
 
-(* --- Auto-expire --- *)
-IF ReserveTimer.Q THEN
+    (* Second: automatic expiration *)
     RST(Reserved_Latch);
-    TechInit := 0;
-END_IF;
+    TechnicianInitials := 0;
 
+ELSIF (Reserve_CMD AND NOT Reserved_Latch) THEN
+
+    (* Lowest: new reservation *)
+    TechnicianInitials := HMI_Init;
+    SET(Reserved_Latch);
+
+END_IF;
 
 (* ===================================================== *)
 (* ---------------- EXECUTION -------------------------- *)
