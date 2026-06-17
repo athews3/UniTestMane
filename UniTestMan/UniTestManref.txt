@@ -104,32 +104,41 @@ END_IF;
 (* ---------------- RESERVATION ------------------------- *)
 (* ===================================================== *)
 
-(* --- Timer ALWAYS executes (observer only) --- *)
+(* --- EDGE DETECTION --- *)
+Reserve_Rise   := (Reserve_CMD AND NOT PrevReserve);
+ClearRes_Rise  := (ClearReserve_CMD AND NOT PrevClearRes);
+
+PrevReserve  := Reserve_CMD;
+PrevClearRes := ClearReserve_CMD;
+
+
+(* --- TIMER (state observer only) --- *)
 ReserveTimer(
     IN := Reserved_Latch,
     PT := T#5H
 );
 
 
-(* --- Reserve (unchanged core behavior) --- *)
-IF (Reserve_CMD AND NOT Reserved_Latch) THEN
-    TechnInit := HMI_Init;
+(* --- SET (ownership acquisition) --- *)
+IF (Reserve_Rise AND NOT Reserved_Latch) THEN
     SET(Reserved_Latch);
+    TechInit := HMI_Init;
 END_IF;
 
 
-(* --- Clear (unchanged priority behavior) --- *)
-IF ClearReserve_CMD THEN
+(* --- CLEAR (explicit user override - highest priority) --- *)
+IF ClearRes_Rise THEN
     RST(Reserved_Latch);
-    TechnInit := 0;
+    TechInit := 0;
 END_IF;
 
 
-(* --- Expiration (adds capability, does not interfere with set) --- *)
+(* --- TIME EXPIRATION (automatic revoke) --- *)
 IF (Reserved_Latch AND ReserveTimer.Q) THEN
     RST(Reserved_Latch);
     TechInit := 0;
 END_IF;
+
 (* ===================================================== *)
 (* ---------------- EXECUTION -------------------------- *)
 (* ===================================================== *)
