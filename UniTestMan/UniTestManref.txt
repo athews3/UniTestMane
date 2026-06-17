@@ -122,14 +122,14 @@ END_IF;
 (* --- Clear command --- *)
 IF ClearReserve_CMD THEN
     RST(Reserved_Latch);
-    TechnicianInitials := 0;
+    TechnInit := 0;
 END_IF;
 
 
 (* --- Auto-expire --- *)
 IF ReserveTimer.Q THEN
     RST(Reserved_Latch);
-    TechnInit := 0;
+    TechInit := 0;
 END_IF;
 
 
