@@ -106,14 +106,14 @@ END_IF;
 
 (* --- Reserve (one-shot latch) --- *)
 IF (Reserve_CMD AND NOT Reserved_Latch) THEN
-    TechnicianInitials := HMI_Init;
+    TechInit := HMI_Init;
     SET(Reserved_Latch);
 END_IF;
 
 
 (* --- Reservation timer (1 hour) --- *)
 IF Reserved_Latch THEN
-    ReserveTimer(IN := TRUE, PT := T#1H);
+    ReserveTimer(IN := TRUE, PT := T#5H);
 ELSE
     ReserveTimer(IN := FALSE);
 END_IF;
@@ -129,7 +129,7 @@ END_IF;
 (* --- Auto-expire --- *)
 IF ReserveTimer.Q THEN
     RST(Reserved_Latch);
-    TechnicianInitials := 0;
+    TechnInit := 0;
 END_IF;
 
 
