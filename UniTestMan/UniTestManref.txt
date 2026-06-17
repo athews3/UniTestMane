@@ -101,20 +101,33 @@ END_IF;
 
 
 (* ===================================================== *)
-(* ---------------- RESERVATION ------------------------ *)
+(* ---------------- RESERVATION ------------------------- *)
 (* ===================================================== *)
+
+(* --- Reserve (one-shot latch) --- *)
 IF (Reserve_CMD AND NOT Reserved_Latch) THEN
-    TechnicianInitials := HMI_Init; 
-    ReservationExpiry  := SD520 + 3600;
+    TechnicianInitials := HMI_Init;
     SET(Reserved_Latch);
 END_IF;
 
+
+(* --- Reservation timer (1 hour) --- *)
+IF Reserved_Latch THEN
+    ReserveTimer(IN := TRUE, PT := T#1H);
+ELSE
+    ReserveTimer(IN := FALSE);
+END_IF;
+
+
+(* --- Clear command --- *)
 IF ClearReserve_CMD THEN
     RST(Reserved_Latch);
     TechnicianInitials := 0;
 END_IF;
 
-IF (Reserved_Latch AND SD520 > ReservationExpiry) THEN
+
+(* --- Auto-expire --- *)
+IF ReserveTimer.Q THEN
     RST(Reserved_Latch);
     TechnicianInitials := 0;
 END_IF;
