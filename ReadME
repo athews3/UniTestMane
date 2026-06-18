@@ -1,132 +1,147 @@
-# Universal Test Manager
+```latex
+\documentclass[11pt]{article}
 
-## Overview
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+
+\titleformat{\section}{\large\bfseries}{}{0em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+
+\title{Universal Test Manager}
+\author{Alex Thews}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Overview}
 Universal Test Manager is a PLC-driven test management system built on the Mitsubishi automation stack. It integrates machine control, operator interface, and test workflow execution using:
+\begin{itemize}[noitemsep]
+    \item GX Works3 -- PLC programming environment
+    \item GT Designer3 -- HMI (GOT) design environment
+\end{itemize}
 
-- **GX Works3** – PLC programming environment  
-- **GT Designer3** – HMI (GOT) design environment  
+The system provides a structured and reusable framework for automated test sequencing, data handling, and operator interaction.
 
-The system is designed to provide a flexible, reusable framework for automated test sequencing, data handling, and operator interaction in industrial environments.
+\section*{Architecture}
 
----
+\subsection*{Core Components}
 
-## Architecture
+\textbf{PLC Logic (GX Works3)}
+\begin{itemize}[noitemsep]
+    \item Sequencing, interlocks, and control logic
+    \item Test state management and timing
+    \item Physical I/O and external device interface
+\end{itemize}
 
-### Core Components
-- **PLC Logic (GX Works3)**
-  - Handles sequencing, interlocks, and control logic
-  - Manages test states, timing, and pass/fail evaluation
-  - Interfaces with physical I/O and external devices
+\textbf{HMI Interface (GT Designer3)}
+\begin{itemize}[noitemsep]
+    \item Operator interaction and visualization
+    \item Test configuration and manual controls
+    \item Status display, alarms, and diagnostics
+\end{itemize}
 
-- **HMI Interface (GT Designer3)**
-  - Operator interaction and visualization
-  - Test configuration and manual controls
-  - Status display, alarms, and diagnostics
+\textbf{Test Manager Layer}
+\begin{itemize}[noitemsep]
+    \item Abstracted test flow control
+    \item Standardized structure for test expansion
+    \item Scalable across multiple stations
+\end{itemize}
 
-- **Test Manager Layer**
-  - Abstracted test flow control
-  - Standardized structure for adding/modifying tests
-  - Supports scalability across different test stations
+\section*{Features}
+\begin{itemize}[noitemsep]
+    \item Modular test sequence structure
+    \item Configurable parameters
+    \item Real-time diagnostics and status feedback
+    \item Pass/fail evaluation logic
+    \item Expandable architecture
+\end{itemize}
 
----
+\section*{Repository Structure}
 
-## Features
+\begin{verbatim}
+/PLC    -> GX Works3 project files
+/HMI    -> GT Designer3 project files
+/Docs   -> Supporting documentation (optional)
+\end{verbatim}
 
-- Modular test sequence structure
-- Configurable test parameters
-- Operator-friendly HMI interface
-- Real-time system status and diagnostics
-- Pass/Fail evaluation logic
-- Expandable for new test routines and hardware
+\section*{Requirements}
 
----
+\subsection*{Software}
+\begin{itemize}[noitemsep]
+    \item GX Works3
+    \item GT Designer3 (GT Works3 suite)
+\end{itemize}
 
-## Repository Structure
-## Requirements
+\subsection*{Hardware}
+\begin{itemize}[noitemsep]
+    \item Mitsubishi PLC (iQ-R, iQ-F, or compatible)
+    \item Mitsubishi GOT HMI
+\end{itemize}
 
-### Software
-- **GX Works3** (Mitsubishi Electric)
-- **GT Designer3** (part of GT Works3 suite)
+\section*{Getting Started}
 
-### Hardware
-- Mitsubishi PLC (iQ-R / iQ-F / or compatible depending on project configuration)
-- Mitsubishi GOT HMI
+\subsection*{PLC Setup}
+\begin{enumerate}[noitemsep]
+    \item Open GX Works3
+    \item Load project from \texttt{/PLC}
+    \item Verify PLC model, I/O, and communications
+    \item Build and download to target PLC
+\end{enumerate}
 
----
+\subsection*{HMI Setup}
+\begin{enumerate}[noitemsep]
+    \item Open GT Designer3
+    \item Load project from \texttt{/HMI}
+    \item Verify communication settings
+    \item Download to GOT terminal
+\end{enumerate}
 
-## Getting Started
+\section*{System Operation}
+\begin{enumerate}[noitemsep]
+    \item Power PLC and HMI
+    \item Establish communication
+    \item Operator initiates test sequence
+    \item PLC executes test logic
+    \item Results and diagnostics displayed on HMI
+\end{enumerate}
 
-### PLC
-1. Open GX Works3
-2. Load the project from `/PLC`
-3. Verify:
-   - PLC model configuration
-   - IO assignments
-   - Communication settings
-4. Build and download to target PLC
+\section*{Development Workflow}
 
-### HMI
-1. Open GT Designer3
-2. Load the project from `/HMI`
-3. Verify:
-   - Device/PLC communication settings
-   - Screen mappings and alarms
-4. Download to GOT terminal
+\textbf{PLC Modifications}
+\begin{itemize}[noitemsep]
+    \item Update logic in GX Works3
+    \item Maintain structured state-machine approach
+    \item Validate before deployment
+\end{itemize}
 
----
+\textbf{HMI Modifications}
+\begin{itemize}[noitemsep]
+    \item Update screens in GT Designer3
+    \item Align device addressing with PLC
+    \item Maintain consistent UI behavior
+\end{itemize}
 
-## System Operation
+\section*{Design Principles}
+\begin{itemize}[noitemsep]
+    \item Modularity
+    \item Deterministic execution
+    \item Operator clarity
+    \item Maintainability
+\end{itemize}
 
-1. Power up PLC and HMI
-2. HMI initializes and establishes PLC communication
-3. Operator selects or starts test sequence
-4. PLC executes test logic:
-   - Enables required outputs
-   - Monitors inputs
-   - Evaluates conditions
-5. Results displayed on HMI
-6. Faults and alarms handled in real-time
+\section*{Notes}
+\begin{itemize}[noitemsep]
+    \item Proprietary Mitsubishi formats require compatible software versions
+    \item Validate hardware mappings before deployment
+    \item Maintain strict version control on PLC/HMI updates
+\end{itemize}
 
----
+\section*{License}
+Specify license if applicable.
 
-## Development Workflow
-
-### Modifying PLC Logic
-- Update structured ladder / function blocks in GX Works3
-- Maintain consistent state-machine design
-- Validate simulation prior to deployment
-
-### Modifying HMI
-- Add/update screens in GT Designer3
-- Ensure device addresses align with PLC variables
-- Maintain consistent navigation and operator flow
-
----
-
-## Design Principles
-
-- **Modularity** – Test logic separated into reusable blocks
-- **Determinism** – Predictable PLC execution cycles
-- **Operator clarity** – Minimal ambiguity in HMI display
-- **Maintainability** – Clean structure for future engineers
-
----
-
-## Notes
-
-- Mitsubishi projects use proprietary formats; ensure compatible software versions are used.
-- Always verify hardware mappings before downloading to live systems.
-- Maintain version control discipline when modifying PLC/HMI files.
-
----
-
-## License
-
-Specify license here if applicable.
-
----
-
-## Author
-
-Alex Thews  
-Product Assurance Engineering Intern
+\end{document}
+```
