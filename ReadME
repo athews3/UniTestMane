@@ -1,4 +1,4 @@
-\documentclass[11pt]{article}
+$$\documentclass[11pt]{article}
 
 \usepackage[margin=1in]{geometry}
 \usepackage{enumitem}
@@ -143,3 +143,4 @@ The system provides a structured and reusable framework for automated test seque
 Specify license if applicable.
 
 \end{document}
+$$
