@@ -46,87 +46,93 @@ The system is designed for deterministic execution, modular expansion, and effic
 ```text
 /PLC        GX Works3 project files
 /HMI        GT Designer3 project files
-/Docs       Documentation (optional)Requirements
-Software
+/Docs       Documentation (optional)
+```
 
-GX Works3
-GT Designer3 (part of GT Works3)
+---
 
-Hardware
+## Requirements
 
-Mitsubishi PLC (iQ-R, iQ-F, or compatible)
-Mitsubishi GOT HMI
+### Software
+- GX Works3  
+- GT Designer3 (part of GT Works3)
 
+### Hardware
+- Mitsubishi PLC (iQ-R, iQ-F, or compatible)  
+- Mitsubishi GOT HMI  
 
-Setup
-PLC
+---
 
-Open GX Works3
-Load /PLC project
-Verify:
+## Setup
 
-PLC model
-I/O mapping
-Communication parameters
+### PLC
+1. Open GX Works3  
+2. Load `/PLC` project  
+3. Verify:
+   - PLC model
+   - I/O mapping
+   - Communication parameters  
+4. Compile and download to target PLC  
 
+### HMI
+1. Open GT Designer3  
+2. Load `/HMI` project  
+3. Verify communication settings  
+4. Download to GOT  
 
-Compile and download to target PLC
+---
 
-HMI
+## Operation
 
-Open GT Designer3
-Load /HMI project
-Verify communication settings
-Download to GOT
+1. Power PLC and HMI  
+2. Establish communication  
+3. Initiate test sequence via HMI  
+4. PLC executes:
+   - Output control  
+   - Input monitoring  
+   - Condition evaluation  
+5. Results displayed on HMI  
 
+---
 
-Operation
+## Development
 
-Power PLC and HMI
-Establish communication
-Initiate test sequence via HMI
-PLC executes:
+### PLC Changes
+- Modify logic in GX Works3  
+- Maintain structured, state-based design  
+- Validate before deployment  
 
-Output control
-Input monitoring
-Condition evaluation
+### HMI Changes
+- Update screens in GT Designer3  
+- Keep device addressing consistent with PLC  
+- Preserve clear operator flow  
 
+---
 
-Results displayed on HMI
+## Design Principles
 
+- Modularity  
+- Deterministic behavior  
+- Clarity for operators  
+- Maintainability  
 
-Development
-PLC Changes
+---
 
-Modify logic in GX Works3
-Maintain structured, state-based design
-Validate before deployment
+## Notes
 
-HMI Changes
+- Mitsubishi project files are proprietary; use compatible software versions  
+- Validate hardware mappings before deployment  
+- Maintain version control discipline for all changes  
 
-Update screens in GT Designer3
-Keep device addressing consistent with PLC
-Preserve clear operator flow
+---
 
+## License
 
-Design Principles
-
-Modularity
-Deterministic behavior
-Clarity for operators
-Maintainability
-
-
-Notes
-
-Mitsubishi project files are proprietary; use compatible software versions
-Validate hardware mappings before deployment
-Maintain version control discipline for all changes
-
-
-License
 Add license as applicable.
 
-Author
-Alex Thews
-Product Assurance Engineering Intern
+---
+
+## Author
+
+Alex Thews  
+Product Assurance Engineering Intern  
