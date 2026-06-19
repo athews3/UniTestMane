@@ -1,0 +1,28 @@
+FUNCTION_BLOCK FB_CPM
+VAR_INPUT
+    Enable         : BOOL;
+    CycleCount_In  : DWORD;
+    SampleTime     : TIME := T#60S;
+END_VAR
+
+VAR_OUTPUT
+    CPM            : REAL;
+END_VAR
+
+VAR
+    LastCount      : DWORD;
+    Delta          : DWORD;
+    Tmr            : TON;
+END_VAR
+
+
+Tmr(IN := Enable, PT := SampleTime);
+
+IF Tmr.Q THEN
+    Delta := CycleCount_In - LastCount;
+    CPM := REAL(Delta);
+
+    LastCount := CycleCount_In;
+
+    Tmr(IN := FALSE);
+END_IF;
