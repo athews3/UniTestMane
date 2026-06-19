@@ -1,85 +1,189 @@
+(* ===================================================== *)
+(* ---------------- TEST CHANGE ------------------------- *)
+(* ===================================================== *)
+IF (HMI_SelectedTest <> LastTest) THEN
 
+    (* --- stop execution --- *)
+    RST(Run_Latch);
 
-(* ---------------- Test Change Handling ---------------- *)
-IF (D100 <> LastTest) THEN
-    RST(M4);        (* FORCE STOP *)
-    RST(M1);
-    RST(M2);
-    D200 := 0;
+    (* --- reset core state --- *)
+    RST(Cycle_Complete);
+    RST(Goal_Reached);
+    RST(Internal_Stop);
+
+    (* --- reset pause --- *)
+    RST(Paused_Latch);
+
+    (* --- reset counters --- *)
+    CycleCount := 0;
+    FailtoRet := 0;
+
+    (* -------- MEMORY CONTAMINATION CONTROL -------- *)
+    RST(M20); RST(M21);
+    RST(M22); RST(M23);
+    RST(M32); RST(M33);
+
+    RST(M6);  RST(M7);
+    RST(M8);  RST(M9);
+    RST(M10); RST(M16);
+
 END_IF;
 
-LastTest := D100;
+LastTest := HMI_SelectedTest;
 
 
-(* ---------------- Start (edge-triggered) ---------------- *)
-IF (M200 AND NOT PrevStart) THEN
-    SET(M4);
+(* ===================================================== *)
+(* ---------------- START (EDGE) ------------------------ *)
+(* ===================================================== *)
+IF (HMI_Start AND NOT PrevStart AND NOT Paused_Latch AND NOT Goal_Reached AND X17) THEN
+    SET(Run_Latch);
+    RST(Internal_Stop);
 END_IF;
 
-PrevStart := M200;
+PrevStart := HMI_Start;
 
 
-(* ---------------- Stop ---------------- *)
-IF M201 THEN
-    RST(M4);
+(* ===================================================== *)
+(* ---------------- STOP ------------------------------- *)
+(* ===================================================== *)
+IF HMI_Stop THEN
+    RST(Run_Latch);
+    RST(Paused_Latch);
+    SET(Internal_Stop);
 END_IF;
 
 
-(* ---------------- Reset ---------------- *)
-IF M202 THEN
-    RST(M4);
-    RST(M1);
-    RST(M2);
-    D200 := 0;
+(* ===================================================== *)
+(* ---------------- RESET ------------------------------ *)
+(* ===================================================== *)
+IF HMI_Reset THEN
+    RST(Run_Latch);
+    RST(Cycle_Complete);
+    RST(Goal_Reached);
+    RST(Paused_Latch);
+    RST(Internal_Stop);
+
+    CycleCount := 0;
+    FailtoRet := 0;
 END_IF;
 
 
-(* ---------------- Status ---------------- *)
-M211 := M4 AND (NOT M2);
-M212 := M2;
+(* ===================================================== *)
+(* ---------------- PAUSE / RESUME --------------------- *)
+(* ===================================================== *)
+
+(*Keep pause/resume latch actuated when button is released*)
+
+Pause_Rise := (HMI_Pause AND NOT PrevPause);
+Resume_Rise := (HMI_Resume AND NOT PrevResume);
+
+PrevPause := HMI_Pause;
+PrevResume := HMI_Resume;
+
+IF (Pause_Rise AND NOT Paused_Latch) THEN
+    SET(Paused_Latch);
+    RST(Run_Latch);
+END_IF;
+
+IF (Resume_Rise AND Paused_Latch AND NOT Goal_Reached AND X17) THEN
+    RST(Paused_Latch);
+    SET(Run_Latch);
+END_IF;
 
 
-(* ---------------- Default Outputs ---------------- *)
-Y0 := FALSE;
-Y1 := FALSE;
-Y2 := FALSE;
+(* ===================================================== *)
+(* ---------------- INTERLOCK -------------------------- *)
+(* ===================================================== *)
+IF NOT X17 THEN
+    RST(Run_Latch);
+    SET(Internal_Stop);
+END_IF;
 
 
-(* ---------------- Test Execution ---------------- *)
-IF M4 AND (NOT M2) THEN
+(* ===================================================== *)
+(* ---------------- RESERVATION ------------------------- *)
+(* ===================================================== *)
 
-    CASE D100 OF
+(* --- EDGE DETECTION --- *)
+Reserve_Rise   := (Reserve_CMD AND NOT PrevReserve);
+ClearRes_Rise  := (ClearReserve_CMD AND NOT PrevClearRes);
 
-        1:
-		TrimInst();
+PrevReserve  := Reserve_CMD;
+PrevClearRes := ClearReserve_CMD;
 
-        2:
-		ExitAirInst();
 
-        3:
-		ExitCloserInst();
-		
-		4:
-		QELInst();
-		
-		5:
-		ChexitInst();
-		
-		6:
-		MagLockInst();
+(* --- TIMER (state observer only) --- *)
+ReserveTimer(
+    IN := Reserved_Latch,
+    PT := T#5H
+);
 
+
+(* --- SET (ownership acquisition) --- *)
+IF (Reserve_Rise AND NOT Reserved_Latch) THEN
+    SET(Reserved_Latch);
+    TechInit := HMI_Init;
+END_IF;
+
+
+(* --- CLEAR (explicit user override - highest priority) --- *)
+IF ClearRes_Rise THEN
+    RST(Reserved_Latch);
+    TechInit := 0;
+END_IF;
+
+
+(* --- TIME EXPIRATION (automatic revoke) --- *)
+IF (Reserved_Latch AND ReserveTimer.Q) THEN
+    RST(Reserved_Latch);
+    TechInit := 0;
+END_IF;
+
+(* ===================================================== *)
+(* ---------------- EXECUTION -------------------------- *)
+(* ===================================================== *)
+IF (Run_Latch AND NOT Goal_Reached AND NOT Paused_Latch) THEN
+
+    CASE HMI_SelectedTest OF
+        1: TrimInst();
+        2: ExitAirInst();
+        3: ExitCloserInst();
+        4: QELInst();
+        5: MagLockInst();
+        6: ChexitInst();
     END_CASE;
-    
-	IF PrevM1 THEN
-			RST(M1);
-	END_IF;
-	
-	PrevM1 := M1;
-	(* ---------- Heartbeat ---------- *)
-	IF ( (NOT X17) AND FX5CPU.stSM.b1sClock ) THEN
-		SET(M3);
-		ELSE
-		RST(M3);
-	END_IF;
+
 END_IF;
 
+
+(* ===================================================== *)
+(* ---------------- COMPLETION ------------------------- *)
+(* ===================================================== *)
+IF Goal_Reached THEN
+    RST(Run_Latch);
+    SET(Internal_Stop);
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- DERIVED STATES --------------------- *)
+(* ===================================================== *)
+
+Running_State := Run_Latch AND NOT Goal_Reached;
+Paused_State  := Paused_Latch;
+Reserved_State := Reserved_Latch;
+
+Idle_State :=
+(NOT Run_Latch)
+AND (NOT Paused_Latch)
+AND (NOT Goal_Reached)
+AND (Internal_Stop OR NOT X17);
+
+
+(* ===================================================== *)
+(* ---------------- HMI LAMPS -------------------------- *)
+(* ===================================================== *)
+
+Test_Running  := Running_State;
+Test_Complete := Goal_Reached;
+Test_Ready    := Idle_State;

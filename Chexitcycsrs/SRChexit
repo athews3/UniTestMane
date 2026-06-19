@@ -3,75 +3,75 @@ tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4 AND NOT M5), PT := T#
 
 
 (* ---------------- Open Door 1 ---------------- *)
-tOpen1(IN := ((tStartDelay.Q AND X17 AND X0 AND NOT M1) OR M20), PT := T#1s);
+tOpen1(IN := ((tStartDelay.Q AND X17 AND X0 AND NOT M1 AND M4) OR M20), PT := T#1s);
 
-IF tOpen1.Q THEN
+IF (tOpen1.Q AND M4) THEN
     M20 := TRUE;
 ELSE
-    IF NOT tStartDelay.Q THEN
+    IF (NOT tStartDelay.Q OR NOT M4) THEN
         M20 := FALSE;
     END_IF;
 END_IF;
 
 
 (* ---------------- Close Door 1 ---------------- *)
-tClose1(IN := ((tOpen1.Q AND NOT X0 AND X17 AND NOT M1) OR M21), PT := T#1s);
+tClose1(IN := ((tOpen1.Q AND NOT X0 AND X17 AND NOT M1 AND M4) OR M21), PT := T#1s);
 
-IF tClose1.Q THEN
+IF (tClose1.Q AND M4) THEN
     M21 := TRUE;
 ELSE
-    IF NOT tOpen1.Q THEN
+    IF (NOT tOpen1.Q OR NOT M4) THEN
         M21 := FALSE;
     END_IF;
 END_IF;
 
 
 (* ---------------- QEL Energize ---------------- *)
-tQEL(IN := ((tClose1.Q AND X17 AND X0 AND NOT M1) OR Y0), PT := T#1s);
+tQEL(IN := ((tClose1.Q AND X17 AND X0 AND NOT M1 AND M4) OR Y0), PT := T#1s);
 
-IF tQEL.Q THEN
+IF (tQEL.Q AND M4) THEN
     Y0 := TRUE;
 ELSE
-    IF NOT tClose1.Q THEN
+    IF (NOT tClose1.Q AND NOT M4) THEN
         Y0 := FALSE;
     END_IF;
 END_IF;
 
 
 (* ---------------- Open Door 2 ---------------- *)
-tOpen2(IN := ((tQEL.Q AND X17 AND NOT M1) OR M32), PT := T#1s);
+tOpen2(IN := ((tQEL.Q AND X17 AND NOT M1 AND M4) OR M32), PT := T#1s);
 
-IF tOpen2.Q THEN
+IF (tOpen2.Q AND M4) THEN
     M32 := TRUE;
 ELSE
-    IF NOT tQEL.Q THEN
+    IF (NOT tQEL.Q AND M4) THEN
         M32 := FALSE;
     END_IF;
 END_IF;
 
 
 (* ---------------- Rising edge detect T5 ---------------- *)
-t5Rise := tOpen2.Q AND NOT prevT5;
+t5Rise := (tOpen2.Q AND NOT prevT5);
 prevT5 := tOpen2.Q;
 
 
 (* ---------------- Counters ---------------- *)
-IF (t5Rise AND X17 AND NOT X0) THEN
+IF (t5Rise AND X17 AND NOT X0 AND M4) THEN
     FailtoRet := FailtoRet + 1;
 END_IF;
 
-IF (t5Rise AND X17 AND X0) THEN
+IF (t5Rise AND X17 AND X0 AND M4) THEN
     CycleCount := CycleCount + 1;
 END_IF;
 
 
 (* ---------------- Close Door 2 ---------------- *)
-tClose2(IN := ((tOpen2.Q AND X17 AND NOT M1) OR M33), PT := T#1s);
+tClose2(IN := ((tOpen2.Q AND X17 AND NOT M1 AND M4) OR M33), PT := T#1s);
 
-IF tClose2.Q THEN
+IF (tClose2.Q AND M4) THEN
     M33 := TRUE;
 ELSE
-    IF NOT tOpen2.Q THEN
+    IF (NOT tOpen2.Q OR NOT M4) THEN
         M33 := FALSE;
     END_IF;
 END_IF;
@@ -83,7 +83,7 @@ Y2 := (M21 AND NOT Y0) OR (M33 AND NOT M1);     (* Close door *)
 
 
 (* ---------------- Cycle Complete ---------------- *)
-IF (tClose2.Q AND X17) THEN
+IF (tClose2.Q AND X17 AND M4) THEN
     SET(M1);
     CycleCount := CycleCount + 1;
 END_IF;
