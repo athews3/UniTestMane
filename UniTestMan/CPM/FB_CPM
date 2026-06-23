@@ -1,28 +1,32 @@
 FUNCTION_BLOCK FB_CPM
 VAR_INPUT
-    Enable         : BOOL;
-    CycleCount_In  : DWORD;
-    SampleTime     : TIME := T#60S;
+    Enable        : BOOL;
+    CycleCount_In : DINT;
 END_VAR
 
 VAR_OUTPUT
-    CPM            : REAL;
+    CPM           : DINT;
 END_VAR
 
 VAR
-    LastCount      : DWORD;
-    Delta          : DWORD;
-    Tmr            : TON;
+    LastCount     : DINT;
+    Delta         : DINT;
+    SecCounter    : DINT;
 END_VAR
 
 
-Tmr(IN := Enable, PT := SampleTime);
+(* 1-second clock accumulation using FX5 system bit *)
+IF Enable AND FX5CPU.stSM.b1sClock THEN
+    SecCounter := SecCounter + 1;
+END_IF;
 
-IF Tmr.Q THEN
+(* every 60 seconds *)
+IF SecCounter >= 60 THEN
+
     Delta := CycleCount_In - LastCount;
-    CPM := REAL(Delta);
+    CPM := Delta;
 
     LastCount := CycleCount_In;
+    SecCounter := 0;
 
-    Tmr(IN := FALSE);
 END_IF;
