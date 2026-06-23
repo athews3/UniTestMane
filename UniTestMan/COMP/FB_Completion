@@ -1,33 +1,24 @@
 FUNCTION_BLOCK FB_Completion
 VAR_INPUT
-    CycleCount_In  : DWORD;
-    CycleTarget_In : DWORD;
-    CPM_In         : REAL;
+    CycleCount_In  : DINT;
+    CycleTarget_In : DINT;
+    CPM_In         : DINT;
     CurrentTime_s  : DINT;
 END_VAR
 
 VAR_OUTPUT
-    RemainingCycles : DWORD;
-    MinutesRemain   : REAL;
+    RemainingCycles : DINT;
+    MinutesRemain   : DINT;
     CompletionTime  : DINT;
-END_VAR
-
-VAR
-    RemainREAL     : REAL;
-    SecondsRemain  : REAL;
 END_VAR
 
 
 RemainingCycles := CycleTarget_In - CycleCount_In;
 
-RemainREAL := DWORD_TO_REAL(RemainingCycles);
-
-IF CPM_In > 0.0 THEN
-    MinutesRemain := RemainREAL / CPM_In;
+IF CPM_In > 0 THEN
+    MinutesRemain := RemainingCycles / CPM_In;
 ELSE
-    MinutesRemain := 0.0;
+    MinutesRemain := 0;
 END_IF;
 
-SecondsRemain := MinutesRemain * 60.0;
-
-CompletionTime := CurrentTime_s + REAL_TO_DINT(SecondsRemain);
+CompletionTime := CurrentTime_s + (MinutesRemain * 60);
