@@ -10,7 +10,7 @@ IF (HMI_SelectedTest <> LastTest) THEN
     RST(Cycle_Complete);
     RST(Goal_Reached);
     RST(Internal_Stop);
-
+	RST(NextPause_Setpoint);
     (* --- reset pause --- *)
     RST(Paused_Latch);
 
@@ -62,7 +62,7 @@ IF HMI_Reset THEN
     RST(Goal_Reached);
     RST(Paused_Latch);
     RST(Internal_Stop);
-
+	RST(NextPause_Setpoint);
     CycleCount := 0;
     FailtoRet := 0;
 END_IF;
@@ -100,6 +100,7 @@ IF NOT X17 THEN
 END_IF;
 
 
+
 (* ===================================================== *)
 (* ---------------- RESERVATION ------------------------- *)
 (* ===================================================== *)
@@ -114,8 +115,8 @@ PrevClearRes := ClearReserve_CMD;
 
 (* --- TIMER (state observer only) --- *)
 ReserveTimer(
-    IN := Reserved_Latch,
-    PT := T#5H
+IN := Reserve_Rise,
+PT := T#5H
 );
 
 
@@ -155,6 +156,29 @@ IF (Run_Latch AND NOT Goal_Reached AND NOT Paused_Latch) THEN
 
 END_IF;
 
+(*Cycles per minute*)
+CPMInst(
+CycleCount_IN := CycleCount,
+Enable := Running_State);
+
+(*COMPLETION*)
+COMPInst(
+CycleCount_In := CycleCount,
+CycleTarget_In := CycleTarget,
+CPM := CPMInst.CPM
+
+);
+(*Next Pause*)
+NextPauseInst(
+CycleCount_In := CycleCount,
+Setpoint := NextPause_Setpoint,
+Reset := HMI_Reset);
+
+(*Connect to HMI*)
+HMI_CPM := CPMInst.CPM;
+HMI_MinutesRemain := COMPInst.MinutesRemain;
+HMI_RemainingCycles := COMPInst.RemainingCycles;
+NextPause_Active := NextPAUSEInst.Trigger;
 
 (* ===================================================== *)
 (* ---------------- COMPLETION ------------------------- *)
