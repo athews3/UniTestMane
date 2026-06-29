@@ -12,7 +12,13 @@ VAR_OUTPUT
     CompletionTime  : DINT;
 END_VAR
 
-
+(*Device memory mapped as such:
+D410 - Comp Year
+D411 - Comp month
+D412 - Comp Day
+D413 - Comp Hour
+D414 - Comp minute
+*)
 RemainingCycles := CycleTarget_In - CycleCount_In;
 
 IF CPM_In > 0 THEN
