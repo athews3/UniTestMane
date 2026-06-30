@@ -27,4 +27,11 @@ ELSE
     MinutesRemain := 0;
 END_IF;
 
-CompletionTime := CurrentTime_s + (MinutesRemain * 60);
+(* Convert DT -> seconds *)
+CurrentSec := DT_TO_DINT(CurrentDT);
+
+(* Add time *)
+CompletionSec := CurrentSec + (MinutesRemain * 60);
+
+(* Convert back to DT *)
+CompletionDT := DINT_TO_DT(CompletionSec);
