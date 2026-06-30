@@ -1,24 +1,66 @@
 (* ===================================================== *)
-(* ---------------- TEST CHANGE ------------------------- *)
+(* ---------------- EDGE DETECTION --------------------- *)
 (* ===================================================== *)
+
+StartStop_Rise := HMI_StartStop AND NOT PrevStartStop;
+Hold_Rise      := HMI_Hold      AND NOT PrevHold;
+OffHold_Rise   := HMI_OffHold   AND NOT PrevOffHold;
+
+PrevStartStop := HMI_StartStop;
+PrevHold      := HMI_Hold;
+PrevOffHold   := HMI_OffHold;
+
+
+(* ===================================================== *)
+(* ---------------- HOLD REASON VALIDATION ------------- *)
+(* ===================================================== *)
+
+HoldReason_Valid := (HoldReason_Code > 0);
+
+
+(* ===================================================== *)
+(* ---------------- SAFETY / INTERLOCK ----------------- *)
+(* ===================================================== *)
+
+IF NOT X17 THEN
+    RST(Run_Latch);
+    SET(Internal_Stop);
+END_IF;
+
+IF EStop_Latch THEN
+    RST(Run_Latch);
+    SET(Internal_Stop);
+END_IF;
+
+IF HMI_Reset AND X17 THEN
+    RST(EStop_Latch);
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- TEST CHANGE ------------------------ *)
+(* ===================================================== *)
+
 IF (HMI_SelectedTest <> LastTest) THEN
 
-    (* --- stop execution --- *)
     RST(Run_Latch);
 
-    (* --- reset core state --- *)
     RST(Cycle_Complete);
     RST(Goal_Reached);
     RST(Internal_Stop);
-	RST(NextPause_Setpoint);
-    (* --- reset pause --- *)
-    RST(Paused_Latch);
+    RST(NextPause_Setpoint);
 
-    (* --- reset counters --- *)
+    RST(Hold_Latch);
+    RST(Stopped_By_User);
+    RST(Failure_State);
+    RST(ConsecFailTrip);
+    RST(HoldReason_Required);
+
     CycleCount := 0;
     FailtoRet := 0;
+    ConsecutiveFailCnt := 0;
+    HoldReason_Code := 0;
 
-    (* -------- MEMORY CONTAMINATION CONTROL -------- *)
     RST(M20); RST(M21);
     RST(M22); RST(M23);
     RST(M32); RST(M33);
@@ -33,172 +75,212 @@ LastTest := HMI_SelectedTest;
 
 
 (* ===================================================== *)
-(* ---------------- START (EDGE) ------------------------ *)
-(* ===================================================== *)
-IF (HMI_Start AND NOT PrevStart AND NOT Paused_Latch AND NOT Goal_Reached AND X17 AND NOT EStop_Latch) THEN
-    SET(Run_Latch);
-    RST(Internal_Stop);
-END_IF;
-
-PrevStart := HMI_Start;
-
-
-(* ===================================================== *)
-(* ---------------- STOP ------------------------------- *)
-(* ===================================================== *)
-IF HMI_Stop THEN
-    RST(Run_Latch);
-    RST(Paused_Latch);
-    SET(Internal_Stop);
-END_IF;
-
-(* ===================================================== *)
 (* ---------------- RESET ------------------------------ *)
 (* ===================================================== *)
+
 IF HMI_Reset THEN
+
     RST(Run_Latch);
     RST(Cycle_Complete);
     RST(Goal_Reached);
-    RST(Paused_Latch);
     RST(Internal_Stop);
-	RST(NextPause_Setpoint);
+    RST(NextPause_Setpoint);
+
+    RST(Hold_Latch);
+    RST(Stopped_By_User);
+    RST(Failure_State);
+    RST(ConsecFailTrip);
+    RST(HoldReason_Required);
+
     CycleCount := 0;
     FailtoRet := 0;
+    ConsecutiveFailCnt := 0;
+    HoldReason_Code := 0;
+
 END_IF;
 
 
 (* ===================================================== *)
-(* ---------------- PAUSE / RESUME --------------------- *)
+(* ---------------- HOLD / OFF-HOLD -------------------- *)
 (* ===================================================== *)
 
-(*Keep pause/resume latch actuated when button is released*)
+IF Hold_Rise THEN
 
-Pause_Rise := (HMI_Pause AND NOT PrevPause);
-Resume_Rise := (HMI_Resume AND NOT PrevResume);
+    IF HoldReason_Valid THEN
+        SET(Hold_Latch);
+        RST(Run_Latch);
+    ELSE
+        SET(HoldReason_Required);
+    END_IF;
 
-PrevPause := HMI_Pause;
-PrevResume := HMI_Resume;
+END_IF;
 
-IF (Pause_Rise AND NOT Paused_Latch) THEN
-    SET(Paused_Latch);
+IF HoldReason_Required AND HoldReason_Valid THEN
+    SET(Hold_Latch);
     RST(Run_Latch);
+    RST(HoldReason_Required);
 END_IF;
 
-IF (Resume_Rise AND Paused_Latch AND NOT Goal_Reached AND X17 AND NOT EStop_Latch) THEN
-    RST(Paused_Latch);
-    SET(Run_Latch);
+IF OffHold_Rise THEN
+
+    RST(Hold_Latch);
+    RST(HoldReason_Required);
+
+    HoldReason_Code := 0;
+
 END_IF;
 
 
 (* ===================================================== *)
-(* ---------------- INTERLOCK -------------------------- *)
-(* ===================================================== *)
-(*Trip*)
-IF NOT X17 THEN
-    RST(Run_Latch);
-    SET(Internal_Stop);
-END_IF;
-
-(*Enforce stop*)
-
-IF EStop_Latch THEN
-	RST(Run_Latch);
-	SET(Internal_Stop);
-END_IF;
-(*HMI Operator reset*)
-IF HMI_Reset AND X17 THEN
-	RST(EStop_Latch);
-END_IF;
-
-(* ===================================================== *)
-(* ---------------- RESERVATION ------------------------- *)
+(* ---------------- START / STOP TOGGLE ---------------- *)
 (* ===================================================== *)
 
-(* --- EDGE DETECTION --- *)
-Reserve_Rise   := (Reserve_CMD AND NOT PrevReserve);
-ClearRes_Rise  := (ClearReserve_CMD AND NOT PrevClearRes);
+IF StartStop_Rise THEN
 
-PrevReserve  := Reserve_CMD;
-PrevClearRes := ClearReserve_CMD;
+    IF Run_Latch THEN
 
+        RST(Run_Latch);
+        SET(Stopped_By_User);
 
-(* --- TIMER (state observer only) --- *)
-ReserveTimer(
-IN := Reserve_Rise,
-PT := T#5H
-);
+    ELSE
 
+        IF (NOT Goal_Reached)
+        AND (NOT EStop_Latch)
+        AND X17
+        AND (NOT Hold_Latch)
+        AND (NOT Failure_State)
+        AND (NOT ConsecFailTrip) THEN
 
-(* --- SET (ownership acquisition) --- *)
-IF (Reserve_Rise AND NOT Reserved_Latch) THEN
-    SET(Reserved_Latch);
-    TechInit := HMI_Init;
+            SET(Run_Latch);
+            RST(Internal_Stop);
+            RST(Stopped_By_User);
+
+        END_IF;
+
+    END_IF;
+
 END_IF;
 
 
-(* --- CLEAR (explicit user override - highest priority) --- *)
-IF ClearRes_Rise THEN
-    RST(Reserved_Latch);
-    TechInit := 0;
-END_IF;
+(* ===================================================== *)
+(* ---------------- MANAGER EXECUTING ------------------ *)
+(* ===================================================== *)
 
+Manager_Executing :=
+Run_Latch
+AND NOT Goal_Reached
+AND NOT Hold_Latch
+AND NOT Failure_State
+AND NOT ConsecFailTrip
+AND X17
+AND NOT EStop_Latch;
 
-(* --- TIME EXPIRATION (automatic revoke) --- *)
-IF (Reserved_Latch AND ReserveTimer.Q) THEN
-    RST(Reserved_Latch);
-    TechInit := 0;
-END_IF;
 
 (* ===================================================== *)
 (* ---------------- EXECUTION -------------------------- *)
 (* ===================================================== *)
-IF (Run_Latch AND NOT Goal_Reached AND NOT Paused_Latch) THEN
+
+IF Manager_Executing THEN
 
     CASE HMI_SelectedTest OF
-        1: TrimInst();
-        2: ExitAirInst();
-        3: ExitCloserInst();
-        4: QELInst();
-        5: MagLockInst();
-        6: ChexitInst();
+
+        1:
+            TrimInst();
+
+        2:
+            ExitInst(
+                UseCloser := HMI_UseCloser
+            );
+
+        3:
+            ExitCloserInst();
+            (* temporary legacy mapping *)
+
+        4:
+            QELInst();
+
+        5:
+            MagLockInst();
+
+        6:
+            ChexitInst();
+
     END_CASE;
 
 END_IF;
 
-(*Cycles per minute*)
+
+(* ===================================================== *)
+(* ---------------- FAILURE TRACKING ------------------- *)
+(* ===================================================== *)
+
+IF CycleFail_Pulse THEN
+
+    FailtoRet := FailtoRet + 1;
+    ConsecutiveFailCnt := ConsecutiveFailCnt + 1;
+
+END_IF;
+
+IF CyclePass_Pulse THEN
+
+    ConsecutiveFailCnt := 0;
+
+END_IF;
+
+IF ConsecutiveFailCnt >= 5 THEN
+
+    SET(ConsecFailTrip);
+    SET(Failure_State);
+    SET(Internal_Stop);
+    RST(Run_Latch);
+
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- CPM / COMPLETION / NEXT PAUSE ------- *)
+(* ===================================================== *)
+
 CPMInst(
-CycleCount_IN := CycleCount,
-Enable := Running_State);
-
-(*COMPLETION*)
-COMPInst(
-CycleCount_In := CycleCount,
-CycleTarget_In := CycleTarget,
-CPM := CPMInst.CPM
-
+    CycleCount_IN := CycleCount,
+    Enable := Manager_Executing
 );
-(*Next Pause*)
-NextPauseInst(
-CycleCount_In := CycleCount,
-Setpoint := NextPause_Setpoint,
-Reset := HMI_Reset);
 
-(*Connect to HMI and establish completion date/time*)
+COMPInst(
+    CycleCount_In  := CycleCount,
+    CycleTarget_In := CycleTarget,
+    CPM            := CPMInst.CPM
+);
+
+NextPauseInst(
+    CycleCount_In := CycleCount,
+    Setpoint      := NextPause_Setpoint,
+    Reset         := HMI_Reset
+);
+
 HMI_CPM := CPMInst.CPM;
 
-HMI_Comp_Year := COMPInst.Comp_Year;
+HMI_Comp_Year  := COMPInst.Comp_Year;
 HMI_Comp_Month := COMPInst.Comp_Month;
-HMI_Comp_Day := COMPInst.Comp_Day;
-HMI_Comp_Hour := COMPInst.Comp_Hour;
-HMI_Comp_Min := COMPInst.Comp_Min;
+HMI_Comp_Day   := COMPInst.Comp_Day;
+HMI_Comp_Hour  := COMPInst.Comp_Hour;
+HMI_Comp_Min   := COMPInst.Comp_Min;
 
-NextPause_Active := NextPAUSEInst.Trigger;
+NextPause_Active := NextPauseInst.Trigger;
+
+IF NextPauseInst.Trigger AND Cycle_Complete THEN
+    RST(Run_Latch);
+    SET(Stopped_By_User);
+END_IF;
+
 
 (* ===================================================== *)
 (* ---------------- COMPLETION ------------------------- *)
 (* ===================================================== *)
+
 IF Goal_Reached THEN
     RST(Run_Latch);
+    RST(Stopped_By_User);
     SET(Internal_Stop);
 END_IF;
 
@@ -207,22 +289,49 @@ END_IF;
 (* ---------------- DERIVED STATES --------------------- *)
 (* ===================================================== *)
 
-Running_State := Run_Latch AND NOT Goal_Reached;
-Paused_State  := Paused_Latch;
-Reserved_State := Reserved_Latch;
+Running_State :=
+Manager_Executing;
+
+Complete_State :=
+Goal_Reached;
+
+Held_State :=
+Hold_Latch;
+
+Paused_State :=
+Stopped_By_User
+AND NOT Run_Latch
+AND NOT Goal_Reached
+AND NOT Hold_Latch
+AND NOT Failure_State
+AND NOT ConsecFailTrip
+AND X17
+AND NOT EStop_Latch;
+
+Failure_State :=
+ConsecFailTrip
+OR Internal_Stop;
 
 Idle_State :=
-(NOT Run_Latch)
-AND (NOT Paused_Latch)
-AND (NOT Goal_Reached)
-AND (Internal_Stop OR NOT X17);
+NOT Run_Latch
+AND NOT Stopped_By_User
+AND NOT Goal_Reached
+AND NOT Hold_Latch
+AND NOT Paused_State;
+
+Reserved_State := Held_State;
 
 HMI_Estop := EStop_Latch;
+
 
 (* ===================================================== *)
 (* ---------------- HMI LAMPS -------------------------- *)
 (* ===================================================== *)
 
 Test_Running  := Running_State;
-Test_Complete := Goal_Reached;
+Test_Complete := Complete_State;
 Test_Ready    := Idle_State;
+Test_Paused   := Paused_State;
+Test_Held     := Held_State;
+Test_Reserved := Held_State;
+Test_Faulted  := Failure_State;
