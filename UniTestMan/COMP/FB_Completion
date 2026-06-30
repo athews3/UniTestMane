@@ -8,19 +8,52 @@ END_VAR
 VAR_OUTPUT
     RemainingCycles : DINT;
     MinutesRemain   : DINT;
-    CompletionDT    : DT;
+
+    Comp_Year  : INT;
+    Comp_Month : INT;
+    Comp_Day   : INT;
+    Comp_Hour  : INT;
+    Comp_Min   : INT;
 END_VAR
 
 VAR
-    CurrentDT   : DT;
-    AddSeconds  : DINT;
+    (* Raw RTC BCD registers *)
+    RTC_Year_BCD  : WORD;
+    RTC_Month_BCD : WORD;
+    RTC_Day_BCD   : WORD;
+    RTC_Hour_BCD  : WORD;
+    RTC_Min_BCD   : WORD;
+
+    (* Converted to INT *)
+    Year  : INT;
+    Month : INT;
+    Day   : INT;
+    Hour  : INT;
+    Min   : INT;
+
+    AddMin : DINT;
 END_VAR
 
 
-(* --- GET REAL PLC TIME --- *)
-RD_SYS_T(CurrentDT);
+(* -------- READ SYSTEM CLOCK -------- *)
+TRD D8000;
 
-(* --- CORE CALCULATION --- *)
+RTC_Year_BCD  := D8000;
+RTC_Month_BCD := D8001;
+RTC_Day_BCD   := D8002;
+RTC_Hour_BCD  := D8003;
+RTC_Min_BCD   := D8004;
+
+
+(* -------- BCD → INT CONVERSION -------- *)
+Year  := BCDTOINT(RTC_Year_BCD);
+Month := BCDTOINT(RTC_Month_BCD);
+Day   := BCDTOINT(RTC_Day_BCD);
+Hour  := BCDTOINT(RTC_Hour_BCD);
+Min   := BCDTOINT(RTC_Min_BCD);
+
+
+(* -------- CORE CALC -------- *)
 RemainingCycles := CycleTarget_In - CycleCount_In;
 
 IF CPM_In > 0 THEN
@@ -29,13 +62,57 @@ ELSE
     MinutesRemain := 0;
 END_IF;
 
-(* Convert remaining minutes to seconds *)
-AddSeconds := MinutesRemain * 60;
+AddMin := MinutesRemain;
 
-(* --- ADD TIME USING MITSUBISHI INSTRUCTION --- *)
-DTADD(
-    EN  := TRUE,
-    IN1 := CurrentDT,
-    IN2 := AddSeconds,
-    OUT := CompletionDT
-);
+
+(* -------- ADD MINUTES -------- *)
+
+Min := Min + AddMin;
+
+(* Minute rollover *)
+Hour := Hour + (Min / 60);
+Min  := Min MOD 60;
+
+(* Hour rollover *)
+Day := Day + (Hour / 24);
+Hour := Hour MOD 24;
+
+
+(* -------- DAY/MONTH/YEAR HANDLING -------- *)
+
+(* Simplified month length handling *)
+CASE Month OF
+    1,3,5,7,8,10,12:
+        WHILE Day > 31 DO
+            Day := Day - 31;
+            Month := Month + 1;
+        END_WHILE;
+
+    4,6,9,11:
+        WHILE Day > 30 DO
+            Day := Day - 30;
+            Month := Month + 1;
+        END_WHILE;
+
+    2:
+        (* No leap year handling – industrial simplification *)
+        WHILE Day > 28 DO
+            Day := Day - 28;
+            Month := Month + 1;
+        END_WHILE;
+END_CASE;
+
+
+(* Month rollover *)
+WHILE Month > 12 DO
+    Month := Month - 12;
+    Year := Year + 1;
+END_WHILE;
+
+
+(* -------- OUTPUT -------- *)
+Comp_Year  := Year;
+Comp_Month := Month;
+Comp_Day   := Day;
+Comp_Hour  := Hour;
+Comp_Min   := Min;
