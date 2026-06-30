@@ -3,22 +3,24 @@ VAR_INPUT
     CycleCount_In  : DINT;
     CycleTarget_In : DINT;
     CPM_In         : DINT;
-    CurrentTime_s  : DINT;
 END_VAR
 
 VAR_OUTPUT
     RemainingCycles : DINT;
     MinutesRemain   : DINT;
-    CompletionTime  : DINT;
+    CompletionDT    : DT;
 END_VAR
 
-(*Device memory mapped as such:
-D410 - Comp Year
-D411 - Comp month
-D412 - Comp Day
-D413 - Comp Hour
-D414 - Comp minute
-*)
+VAR
+    CurrentDT   : DT;
+    AddSeconds  : DINT;
+END_VAR
+
+
+(* --- GET REAL PLC TIME --- *)
+RD_SYS_T(CurrentDT);
+
+(* --- CORE CALCULATION --- *)
 RemainingCycles := CycleTarget_In - CycleCount_In;
 
 IF CPM_In > 0 THEN
@@ -27,11 +29,13 @@ ELSE
     MinutesRemain := 0;
 END_IF;
 
-(* Convert DT -> seconds *)
-CurrentSec := DT_TO_DINT(CurrentDT);
+(* Convert remaining minutes to seconds *)
+AddSeconds := MinutesRemain * 60;
 
-(* Add time *)
-CompletionSec := CurrentSec + (MinutesRemain * 60);
-
-(* Convert back to DT *)
-CompletionDT := DINT_TO_DT(CompletionSec);
+(* --- ADD TIME USING MITSUBISHI INSTRUCTION --- *)
+DTADD(
+    EN  := TRUE,
+    IN1 := CurrentDT,
+    IN2 := AddSeconds,
+    OUT := CompletionDT
+);
