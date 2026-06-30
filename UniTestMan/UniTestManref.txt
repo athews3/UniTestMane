@@ -104,7 +104,7 @@ END_IF;
 IF EStop_Latch THEN
 	RST(Run_Latch);
 	SET(Internal_Stop);
-	
+END_IF;
 (*HMI Operator reset*)
 IF HMI_Reset AND X17 THEN
 	RST(EStop_Latch);
