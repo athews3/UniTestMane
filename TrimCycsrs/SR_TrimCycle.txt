@@ -1,3 +1,7 @@
+(* NOTE: requires new locals in GX Works3's variable table (not shown in this
+   plain-text export): cycleDoneEdge, prevCycleDone : BOOL;
+   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL. *)
+
 (* Pre-delay *)
 tPreDelay(IN := ((X0 OR tPreDelay.Q) AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#5s);
 
@@ -22,11 +26,19 @@ x0Fall := (NOT X0) AND prevX0;
 prevX0 := X0;
 
 
-(* Cycle complete *)
-IF (tValve.Q AND (NOT X0)) THEN
-    SET(M1);
+(* Cycle complete (one-scan pulse, not a permanent latch) *)
+cycleDoneEdge := (tValve.Q AND (NOT X0)) AND NOT prevCycleDone;
+prevCycleDone := (tValve.Q AND (NOT X0));
+
+IF cycleDoneEdge THEN
+    M1 := TRUE;
     CycleCount := CycleCount + 1;
+    CyclePass_Pulse := TRUE;
+ELSE
+    M1 := FALSE;
+    CyclePass_Pulse := FALSE;
 END_IF;
+CycleFail_Pulse := FALSE;
 
 
 (* Goal reached *)
