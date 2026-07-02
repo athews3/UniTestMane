@@ -1,5 +1,14 @@
+(* NOTE: requires new locals in GX Works3's variable table (not shown in this
+   plain-text export): failRetractRise, prevFailRetract : BOOL;
+   cycleDoneEdge, prevCycleDone : BOOL;
+   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL.
+   The undeclared/orphaned M5 fail-limit trip and the direct FailtoRet write
+   have been removed — the manager now owns fail counting via CycleFail_Pulse
+   (see UniTestManref.txt's failure-tracking block). The dead D200 write has
+   been replaced with the actual CycleCount label so cycles now really count. *)
+
 (* ---------------- Precondition / Start Delay ---------------- *)
-tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4 AND NOT M5 AND M4), PT := T#1s);
+tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1s);
 
 (* ---------------- Pushbar / Unpowered State ---------------- *)
 IF (M6 AND NOT M7 AND X17 AND M4) THEN
@@ -37,12 +46,16 @@ ELSE
     END_IF;
 END_IF;
 
-(* ---------------- Fail Counter ---------------- *)
-IF (tFailRetract.Q AND X17 AND NOT M9 AND M4) THEN
+(* ---------------- Fail Counter (edge-pulsed, not level-driven) ---------------- *)
+failRetractRise := tFailRetract.Q AND NOT prevFailRetract;
+prevFailRetract := tFailRetract.Q;
+
+IF (failRetractRise AND X17 AND NOT M9 AND M4) THEN
     M16 := TRUE;
-    FailtoRet := FailtoRet + 1;
+    CycleFail_Pulse := TRUE;
 ELSE
     M16 := FALSE;
+    CycleFail_Pulse := FALSE;
 END_IF;
 
 (* ---------------- Power Break ---------------- *)
@@ -78,18 +91,20 @@ ELSE
     END_IF;
 END_IF;
 
-(* ---------------- Cycle Complete ---------------- *)
-IF (tReengage.Q AND X17 AND M4) THEN
-    SET(M1);
-    D200 := D200 + 1;
+(* ---------------- Cycle Complete (one-scan pulse, not a permanent latch) ---------------- *)
+cycleDoneEdge := (tReengage.Q AND X17 AND M4) AND NOT prevCycleDone;
+prevCycleDone := (tReengage.Q AND X17 AND M4);
+
+IF cycleDoneEdge THEN
+    M1 := TRUE;
+    CycleCount := CycleCount + 1;
+    CyclePass_Pulse := TRUE;
+ELSE
+    M1 := FALSE;
+    CyclePass_Pulse := FALSE;
 END_IF;
 
 (* ---------------- Goal Reached ---------------- *)
 IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
-END_IF;
-
-(* ---------------- Fail Limit ---------------- *)
-IF (FailtoRet > 500) THEN
-    SET(M5);
 END_IF;
