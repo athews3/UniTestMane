@@ -1,3 +1,7 @@
+(* NOTE: requires new locals in GX Works3's variable table (not shown in this
+   plain-text export): cycleDoneEdge, prevCycleDone : BOOL;
+   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL. *)
+
 (* ---------------- Start + Self-hold ---------------- *)
 tStart(IN := ((X0 AND X17 AND NOT M2 AND M4) OR M21) AND NOT M1 AND M4, PT := T#1s);
 
@@ -82,14 +86,22 @@ ELSE
 END_IF;
 
 
-(* ---------------- Cycle Complete ---------------- *)
-IF (tFinalize.Q AND X0 AND M4) THEN
-    SET(M1);
+(* ---------------- Cycle Complete (one-scan pulse, not a permanent latch) ---------------- *)
+cycleDoneEdge := (tFinalize.Q AND X0 AND M4) AND NOT prevCycleDone;
+prevCycleDone := (tFinalize.Q AND X0 AND M4);
+
+IF cycleDoneEdge THEN
+    M1 := TRUE;
     CycleCount := CycleCount + 1;
+    CyclePass_Pulse := TRUE;
+ELSE
+    M1 := FALSE;
+    CyclePass_Pulse := FALSE;
 END_IF;
+CycleFail_Pulse := FALSE;
 
 
 (* ---------------- Goal Reached ---------------- *)
-IF (CycleCount > CycleTarget) AND (CycleTarget > 0) THEN
+IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
 END_IF;
