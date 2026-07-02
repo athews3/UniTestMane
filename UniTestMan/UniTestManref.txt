@@ -23,6 +23,7 @@ HoldReason_Valid := (HoldReason_Code > 0);
 (* ===================================================== *)
 
 IF NOT X17 THEN
+    SET(EStop_Latch);
     RST(Run_Latch);
     SET(Internal_Stop);
 END_IF;
@@ -48,7 +49,7 @@ IF (HMI_SelectedTest <> LastTest) THEN
     RST(Cycle_Complete);
     RST(Goal_Reached);
     RST(Internal_Stop);
-    RST(NextPause_Setpoint);
+    NextPause_Setpoint := 0;
 
     RST(Hold_Latch);
     RST(Stopped_By_User);
@@ -84,7 +85,7 @@ IF HMI_Reset THEN
     RST(Cycle_Complete);
     RST(Goal_Reached);
     RST(Internal_Stop);
-    RST(NextPause_Setpoint);
+    NextPause_Setpoint := 0;
 
     RST(Hold_Latch);
     RST(Stopped_By_User);
@@ -180,30 +181,39 @@ AND NOT EStop_Latch;
 (* ---------------- EXECUTION -------------------------- *)
 (* ===================================================== *)
 
+CyclePass_Pulse := FALSE;
+CycleFail_Pulse := FALSE;
+
 IF Manager_Executing THEN
 
     CASE HMI_SelectedTest OF
 
         1:
             TrimInst();
+            CyclePass_Pulse := TrimInst.CyclePass_Pulse;
+            CycleFail_Pulse := TrimInst.CycleFail_Pulse;
 
         2:
             ExitInst(
                 UseCloser := HMI_UseCloser
             );
-
-        3:
-            ExitCloserInst();
-            (* temporary legacy mapping *)
+            CyclePass_Pulse := ExitInst.CyclePass_Pulse;
+            CycleFail_Pulse := ExitInst.CycleFail_Pulse;
 
         4:
             QELInst();
+            CyclePass_Pulse := QELInst.CyclePass_Pulse;
+            CycleFail_Pulse := QELInst.CycleFail_Pulse;
 
         5:
             MagLockInst();
+            CyclePass_Pulse := MagLockInst.CyclePass_Pulse;
+            CycleFail_Pulse := MagLockInst.CycleFail_Pulse;
 
         6:
             ChexitInst();
+            CyclePass_Pulse := ChexitInst.CyclePass_Pulse;
+            CycleFail_Pulse := ChexitInst.CycleFail_Pulse;
 
     END_CASE;
 
@@ -214,16 +224,23 @@ END_IF;
 (* ---------------- FAILURE TRACKING ------------------- *)
 (* ===================================================== *)
 
-IF CycleFail_Pulse THEN
+IF CyclePass_Pulse AND NOT CycleFail_Pulse THEN
+
+    ConsecutiveFailCnt := 0;
+
+END_IF;
+
+IF CycleFail_Pulse AND NOT CyclePass_Pulse THEN
 
     FailtoRet := FailtoRet + 1;
     ConsecutiveFailCnt := ConsecutiveFailCnt + 1;
 
 END_IF;
 
-IF CyclePass_Pulse THEN
+IF CyclePass_Pulse AND CycleFail_Pulse THEN
 
-    ConsecutiveFailCnt := 0;
+    (* Both pulses in the same scan is an invalid state - treat as a logic fault *)
+    SET(Failure_State);
 
 END_IF;
 
@@ -242,14 +259,14 @@ END_IF;
 (* ===================================================== *)
 
 CPMInst(
-    CycleCount_IN := CycleCount,
+    CycleCount_In := CycleCount,
     Enable := Manager_Executing
 );
 
 COMPInst(
     CycleCount_In  := CycleCount,
     CycleTarget_In := CycleTarget,
-    CPM            := CPMInst.CPM
+    CPM_In         := CPMInst.CPM
 );
 
 NextPauseInst(
@@ -292,9 +309,6 @@ END_IF;
 Running_State :=
 Manager_Executing;
 
-Complete_State :=
-Goal_Reached;
-
 Held_State :=
 Hold_Latch;
 
@@ -308,30 +322,15 @@ AND NOT ConsecFailTrip
 AND X17
 AND NOT EStop_Latch;
 
-Failure_State :=
-ConsecFailTrip
-OR Internal_Stop;
-
 Idle_State :=
 NOT Run_Latch
 AND NOT Stopped_By_User
 AND NOT Goal_Reached
 AND NOT Hold_Latch
-AND NOT Paused_State;
+AND NOT Paused_State
+AND NOT Failure_State
+AND NOT EStop_Latch;
 
-Reserved_State := Held_State;
+Test_Complete := Goal_Reached;
 
-HMI_Estop := EStop_Latch;
-
-
-(* ===================================================== *)
-(* ---------------- HMI LAMPS -------------------------- *)
-(* ===================================================== *)
-
-Test_Running  := Running_State;
-Test_Complete := Complete_State;
-Test_Ready    := Idle_State;
-Test_Paused   := Paused_State;
-Test_Held     := Held_State;
-Test_Reserved := Held_State;
-Test_Faulted  := Failure_State;
+HMI_EStop := EStop_Latch;
