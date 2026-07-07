@@ -17,14 +17,7 @@ VAR_OUTPUT
 END_VAR
 
 VAR
-    (* Raw RTC BCD registers *)
-    RTC_Year_BCD  : WORD;
-    RTC_Month_BCD : WORD;
-    RTC_Day_BCD   : WORD;
-    RTC_Hour_BCD  : WORD;
-    RTC_Min_BCD   : WORD;
-
-    (* Converted to INT *)
+    (* Current clock values, converted from unsigned-word to INT. *)
     Year  : INT;
     Month : INT;
     Day   : INT;
@@ -35,22 +28,21 @@ VAR
 END_VAR
 
 
-(* -------- READ SYSTEM CLOCK -------- *)
-TRD D8000;
+(* -------- READ SYSTEM CLOCK --------
+   Sourced directly from the CPU's built-in Clock Data global labels
+   (uYear, uMonth, uDay, uHour, uMinute -- all WORD, confirmed in the
+   GX Works3 module label list). These replace the old TRD D8000 +
+   BCD-register approach: the values here are already plain binary,
+   not BCD, so only a WORD-to-INT conversion is needed, not BCDTOINT.
+   WORD_TO_INT is a standard numeric conversion, not a datetime
+   function, but has not been confirmed against this project's
+   instruction reference -- verify if GX Works3 flags it. *)
 
-RTC_Year_BCD  := D8000;
-RTC_Month_BCD := D8001;
-RTC_Day_BCD   := D8002;
-RTC_Hour_BCD  := D8003;
-RTC_Min_BCD   := D8004;
-
-
-(* -------- BCD → INT CONVERSION -------- *)
-Year  := BCDTOINT(RTC_Year_BCD);
-Month := BCDTOINT(RTC_Month_BCD);
-Day   := BCDTOINT(RTC_Day_BCD);
-Hour  := BCDTOINT(RTC_Hour_BCD);
-Min   := BCDTOINT(RTC_Min_BCD);
+Year  := WORD_TO_INT(uYear);
+Month := WORD_TO_INT(uMonth);
+Day   := WORD_TO_INT(uDay);
+Hour  := WORD_TO_INT(uHour);
+Min   := WORD_TO_INT(uMinute);
 
 
 (* -------- CORE CALC -------- *)
