@@ -68,7 +68,8 @@ HoldReason_Valid := (HoldReason_Code > 0);
         2. Stops the test
         3. Marks the system as internally stopped
 
-    The system remains stopped until the operator presses the reset button.
+    The latch is intentional. Even if the physical E-stop is released,
+    the system remains stopped until the operator presses Reset.
 *)
 
 IF NOT X17 THEN
@@ -322,3 +323,388 @@ IF StartStop_Rise THEN
             Start is allowed only if:
                 - the test goal has not already been reached
                 - no E-stop is latched
+                - the hardware permissive X17 is healthy
+                - station is not on hold
+                - no active failure exists
+                - the consecutive failure trip has not occurred
+        *)
+        IF (NOT Goal_Reached)
+        AND (NOT EStop_Latch)
+        AND X17
+        AND (NOT Hold_Latch)
+        AND (NOT Failure_State)
+        AND (NOT ConsecFailTrip) THEN
+
+            SET(Run_Latch);
+            RST(Internal_Stop);
+            RST(Stopped_By_User);
+
+        END_IF;
+
+    END_IF;
+
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- MANAGER EXECUTING ------------------ *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Manager_Executing is the final "permission to run actual test logic."
+
+    This is stronger than Run_Latch alone.
+
+    Run_Latch means:
+        "The operator requested running."
+
+    Manager_Executing means:
+        "The system is actually allowed to execute the selected test this scan."
+
+    This prevents test function blocks from running during:
+        - completed test
+        - hold
+        - failure
+        - consecutive failure lockout
+        - E-stop
+        - lost hardware permissive
+*)
+
+Manager_Executing :=
+Run_Latch
+AND NOT Goal_Reached
+AND NOT Hold_Latch
+AND NOT Failure_State
+AND NOT ConsecFailTrip
+AND X17
+AND NOT EStop_Latch;
+
+
+(* ===================================================== *)
+(* ---------------- EXECUTION -------------------------- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Clear the pass/fail pulse interface before calling the selected test.
+
+    These pulse bits represent the result of one completed cycle.
+    They must not remain ON from a previous scan or previous test.
+*)
+
+CyclePass_Pulse := FALSE;
+CycleFail_Pulse := FALSE;
+
+(*
+    Only execute test logic if the manager says it is safe and allowed.
+
+    Exactly one selected test function block is called based on HMI_SelectedTest.
+    Each test function block may output:
+        - CyclePass_Pulse
+        - CycleFail_Pulse
+
+    The manager copies those pulses into common global pulse labels so that
+    downstream failure tracking can work the same way for every test.
+*)
+
+IF Manager_Executing THEN
+
+    CASE HMI_SelectedTest OF
+
+        1:
+            (* Trim cycling test *)
+            TrimInst();
+            CyclePass_Pulse := TrimInst.CyclePass_Pulse;
+            CycleFail_Pulse := TrimInst.CycleFail_Pulse;
+
+        2:
+            (*
+                Exit test.
+
+                HMI_UseCloser allows the technician/HMI to select whether
+                closer-related behavior should be included in this exit test.
+            *)
+            ExitInst(
+                UseCloser := HMI_UseCloser
+            );
+            CyclePass_Pulse := ExitInst.CyclePass_Pulse;
+            CycleFail_Pulse := ExitInst.CycleFail_Pulse;
+
+        4:
+            (* QEL cycling test *)
+            QELInst();
+            CyclePass_Pulse := QELInst.CyclePass_Pulse;
+            CycleFail_Pulse := QELInst.CycleFail_Pulse;
+
+        5:
+            (* Mag lock cycling test *)
+            MagLockInst();
+            CyclePass_Pulse := MagLockInst.CyclePass_Pulse;
+            CycleFail_Pulse := MagLockInst.CycleFail_Pulse;
+
+        6:
+            (* Chexit cycling test *)
+            ChexitInst();
+            CyclePass_Pulse := ChexitInst.CyclePass_Pulse;
+            CycleFail_Pulse := ChexitInst.CycleFail_Pulse;
+
+    END_CASE;
+
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- FAILURE TRACKING ------------------- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Track both total failures and consecutive failures.
+
+    Total failures:
+        FailtoRet
+
+    Consecutive failures:
+        ConsecutiveFailCnt
+
+    A pass resets the consecutive failure counter.
+    A failure increments both total failures and consecutive failures.
+
+    This allows the system to detect not just "how many failures happened,"
+    but whether failures are happening repeatedly in a row.
+*)
+
+IF CyclePass_Pulse AND NOT CycleFail_Pulse THEN
+
+    (* A successful cycle breaks the failure streak *)
+    ConsecutiveFailCnt := 0;
+
+END_IF;
+
+IF CycleFail_Pulse AND NOT CyclePass_Pulse THEN
+
+    (* A failed cycle increments both total failures and current failure streak *)
+    FailtoRet := FailtoRet + 1;
+    ConsecutiveFailCnt := ConsecutiveFailCnt + 1;
+
+END_IF;
+
+(*
+    A cycle cannot logically be both pass and fail in the same scan.
+
+    If both pulses are ON at the same time, the selected test FB has produced
+    contradictory information. Treat this as a logic fault and stop trusting
+    the running condition.
+*)
+
+IF CyclePass_Pulse AND CycleFail_Pulse THEN
+
+    SET(Failure_State);
+
+END_IF;
+
+(*
+    If five failures occur consecutively, trip the failure lockout.
+
+    This stops the test and requires operator/technician intervention.
+*)
+
+IF ConsecutiveFailCnt >= 5 THEN
+
+    SET(ConsecFailTrip);
+    SET(Failure_State);
+    SET(Internal_Stop);
+    RST(Run_Latch);
+
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- CPM / COMPLETION / NEXT PAUSE ------- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Run utility calculations after test execution.
+
+    These utility function blocks do not perform the physical test sequence.
+    They calculate status information used by the HMI and future database logging.
+*)
+
+(*
+    CPMInst calculates cycles per minute.
+
+    It uses:
+        - current cycle count
+        - whether the manager is actually executing
+
+    If the manager is not executing, CPM calculation should not treat idle time
+    as normal test time unless CPMInst is intentionally designed to do so.
+*)
+
+CPMInst(
+    CycleCount_In := CycleCount,
+    Enable := Manager_Executing
+);
+
+(*
+    COMPInst estimates the projected completion date/time.
+
+    It uses:
+        - current cycle count
+        - target cycle count
+        - calculated CPM
+
+    Important:
+        This is an estimate, not a guaranteed completion time.
+        If CPM changes, the displayed completion date/time may move.
+*)
+
+COMPInst(
+    CycleCount_In  := CycleCount,
+    CycleTarget_In := CycleTarget,
+    CPM_In         := CPMInst.CPM
+);
+
+(*
+    NextPauseInst checks whether the station has reached the next configured
+    pause point based on cycle count.
+
+    Example:
+        If NextPause_Setpoint = 1000,
+        the manager can stop the test after the cycle that reaches 1000.
+*)
+
+NextPauseInst(
+    CycleCount_In := CycleCount,
+    Setpoint      := NextPause_Setpoint,
+    Reset         := HMI_Reset
+);
+
+(*
+    Copy utility outputs to HMI/global labels.
+
+    These are the values the HMI displays and Ignition may eventually read.
+*)
+
+HMI_CPM := CPMInst.CPM;
+
+HMI_Comp_Year  := COMPInst.Comp_Year;
+HMI_Comp_Month := COMPInst.Comp_Month;
+HMI_Comp_Day   := COMPInst.Comp_Day;
+HMI_Comp_Hour  := COMPInst.Comp_Hour;
+HMI_Comp_Min   := COMPInst.Comp_Min;
+
+NextPause_Active := NextPauseInst.Trigger;
+
+(*
+    If the Next Pause point is reached at the same time a cycle completes,
+    stop the test and mark it as a user-style stop.
+
+    This stops between completed cycles instead of stopping mid-cycle.
+*)
+
+IF NextPauseInst.Trigger AND Cycle_Complete THEN
+    RST(Run_Latch);
+    SET(Stopped_By_User);
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- COMPLETION ------------------------- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    If the target cycle count has been reached, stop the test and mark
+    the system internally stopped.
+
+    This is a normal completion stop, not a user stop.
+*)
+
+IF Goal_Reached THEN
+    RST(Run_Latch);
+    RST(Stopped_By_User);
+    SET(Internal_Stop);
+END_IF;
+
+
+(* ===================================================== *)
+(* ---------------- DERIVED STATES --------------------- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Convert the internal manager bits into clean HMI states.
+
+    These states are easier for technicians, HMI screens, and Ignition tags
+    to understand than raw internal PLC latches.
+
+    Important:
+    These are derived from the logic above. They should not be driven directly
+    by the HMI.
+*)
+
+(*
+    Running_State means the system is truly executing a test this scan,
+    not merely that the operator pressed Start.
+*)
+
+Running_State :=
+Manager_Executing;
+
+(*
+    Held_State means the station is intentionally on hold.
+*)
+
+Held_State :=
+Hold_Latch;
+
+(*
+    Paused_State means the operator stopped the test with the Start/Stop
+    button and the station is otherwise healthy.
+
+    This excludes:
+        - completed test
+        - hold
+        - failure
+        - consecutive failure lockout
+        - E-stop
+        - lost hardware permissive
+*)
+
+Paused_State :=
+Stopped_By_User
+AND NOT Run_Latch
+AND NOT Goal_Reached
+AND NOT Hold_Latch
+AND NOT Failure_State
+AND NOT ConsecFailTrip
+AND X17
+AND NOT EStop_Latch;
+
+(*
+    Idle_State means the station is not running, not held, not paused,
+    not failed, not complete, and not in E-stop.
+
+    This is the clean waiting state.
+*)
+
+Idle_State :=
+NOT Run_Latch
+AND NOT Stopped_By_User
+AND NOT Goal_Reached
+AND NOT Hold_Latch
+AND NOT Paused_State
+AND NOT Failure_State
+AND NOT EStop_Latch;
+
+(*
+    Test_Complete drives the HMI complete lamp.
+*)
+
+Test_Complete := Goal_Reached;
+
+(*
+    HMI_EStop drives the HMI e-stop indication.
+
+    It uses the latched E-stop state, not only raw X17,
+    so the HMI continues to show the event until reset.
+*)
+
+HMI_EStop := EStop_Latch;
