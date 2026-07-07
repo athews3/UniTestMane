@@ -413,8 +413,8 @@ IF Manager_Executing THEN
         1:
             (* Trim cycling test *)
             TrimInst();
-            CyclePass_Pulse := TrimInst.CyclePass_Pulse;
-            CycleFail_Pulse := TrimInst.CycleFail_Pulse;
+            CyclePass_Pulse := TrimInst.Pass_Pulse;
+            CycleFail_Pulse := TrimInst.Fail_Pulse;
 
         2:
             (*
@@ -426,26 +426,26 @@ IF Manager_Executing THEN
             ExitInst(
                 UseCloser := HMI_UseCloser
             );
-            CyclePass_Pulse := ExitInst.CyclePass_Pulse;
-            CycleFail_Pulse := ExitInst.CycleFail_Pulse;
+            CyclePass_Pulse := ExitInst.Pass_Pulse;
+            CycleFail_Pulse := ExitInst.Fail_Pulse;
 
         4:
             (* QEL cycling test *)
             QELInst();
-            CyclePass_Pulse := QELInst.CyclePass_Pulse;
-            CycleFail_Pulse := QELInst.CycleFail_Pulse;
+            CyclePass_Pulse := QELInst.Pass_Pulse;
+            CycleFail_Pulse := QELInst.Fail_Pulse;
 
         5:
             (* Mag lock cycling test *)
             MagLockInst();
-            CyclePass_Pulse := MagLockInst.CyclePass_Pulse;
-            CycleFail_Pulse := MagLockInst.CycleFail_Pulse;
+            CyclePass_Pulse := MagLockInst.Pass_Pulse;
+            CycleFail_Pulse := MagLockInst.Fail_Pulse;
 
         6:
             (* Chexit cycling test *)
             ChexitInst();
-            CyclePass_Pulse := ChexitInst.CyclePass_Pulse;
-            CycleFail_Pulse := ChexitInst.CycleFail_Pulse;
+            CyclePass_Pulse := ChexitInst.Pass_Pulse;
+            CycleFail_Pulse := ChexitInst.Fail_Pulse;
 
     END_CASE;
 
@@ -547,21 +547,20 @@ CPMInst(
 (*
     COMPInst estimates the projected completion date/time.
 
-    It uses:
-        - current cycle count
-        - target cycle count
-        - calculated CPM
-
-    Important:
-        This is an estimate, not a guaranteed completion time.
-        If CPM changes, the displayed completion date/time may move.
+    TABLED: FB_Completion depends on RTC label wiring (uYear/uMonth/
+    uDay/uHour/uMinute + WORD_TO_INT) that has not been verified
+    against this CPU's instruction set yet. Call is commented out
+    below until that is resolved -- see the simple minutes-remaining
+    stand-in a few lines down.
 *)
 
+(*
 COMPInst(
     CycleCount_In  := CycleCount,
     CycleTarget_In := CycleTarget,
     CPM_In         := CPMInst.CPM
 );
+*)
 
 (*
     NextPauseInst checks whether the station has reached the next configured
@@ -586,11 +585,25 @@ NextPauseInst(
 
 HMI_CPM := CPMInst.CPM;
 
+(*
+    Simple remaining-time proof of concept, standing in for the
+    tabled completion-date estimate. One technician-facing value --
+    estimated minutes remaining -- driven by CPM. No RTC, no
+    calendar rollover, no FB call.
+*)
+IF HMI_CPM > 0 THEN
+    HMI_MinutesRemain := (CycleTarget - CycleCount) / HMI_CPM;
+ELSE
+    HMI_MinutesRemain := 0;
+END_IF;
+
+(*
 HMI_Comp_Year  := COMPInst.Comp_Year;
 HMI_Comp_Month := COMPInst.Comp_Month;
 HMI_Comp_Day   := COMPInst.Comp_Day;
 HMI_Comp_Hour  := COMPInst.Comp_Hour;
 HMI_Comp_Min   := COMPInst.Comp_Min;
+*)
 
 NextPause_Active := NextPauseInst.Trigger;
 
