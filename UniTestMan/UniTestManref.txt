@@ -21,8 +21,14 @@
 *)
 
 StartStop_Rise := HMI_StartStop AND NOT PrevStartStop;
-Hold_Rise      := HMI_Hold      AND NOT PrevHold;
-OffHold_Rise   := HMI_OffHold   AND NOT PrevOffHold;
+
+(*
+    HMI_ClearHold is a single momentary pushbutton that resolves an active
+    hold once the underlying issue is fixed. It carries no reason of its
+    own -- clearing never needs one.
+*)
+
+ClearHold_Rise := HMI_ClearHold AND NOT PrevClearHold;
 
 (*
     Store the current HMI button states so that on the next scan
@@ -30,8 +36,7 @@ OffHold_Rise   := HMI_OffHold   AND NOT PrevOffHold;
 *)
 
 PrevStartStop := HMI_StartStop;
-PrevHold      := HMI_Hold;
-PrevOffHold   := HMI_OffHold;
+PrevClearHold := HMI_ClearHold;
 
 
 (* ===================================================== *)
@@ -39,7 +44,13 @@ PrevOffHold   := HMI_OffHold;
 (* ===================================================== *)
 (*
     Purpose:
-    If a technician places a station on hold, they must provide a reason.
+    Each hold-reason button on the HMI (Sample Broken, etc. -- see
+    CLAUDE.md 5.4a for the current code table) is a GT Designer word
+    switch that writes its own fixed, nonzero value directly into
+    HoldReason_Code. There is no separate "arm the hold" step: pressing
+    a reason button is itself the action that both records the reason
+    and requests the hold, so Ignition always has a reason code to show
+    alongside the hold lamp.
 
     HoldReason_Code is expected to be a numeric value selected from the HMI.
     A value greater than zero means the technician selected a valid reason.
@@ -50,6 +61,18 @@ PrevOffHold   := HMI_OffHold;
 *)
 
 HoldReason_Valid := (HoldReason_Code > 0);
+
+(*
+    HoldReasonValid_Rise fires for one scan when HoldReason_Code goes from
+    invalid (0) to valid (technician just pressed a reason button). This
+    is the single trigger that enters the hold -- see the HOLD / OFF-HOLD
+    block below. Pressing a different reason button while already on hold
+    just updates HoldReason_Code without re-triggering entry logic, which
+    lets a technician correct the recorded reason without clearing first.
+*)
+
+HoldReasonValid_Rise := HoldReason_Valid AND NOT PrevHoldReasonValid;
+PrevHoldReasonValid  := HoldReason_Valid;
 
 
 (* ===================================================== *)
@@ -144,7 +167,6 @@ IF (HMI_SelectedTest <> LastTest) THEN
     RST(Stopped_By_User);
     RST(Failure_State);
     RST(ConsecFailTrip);
-    RST(HoldReason_Required);
 
     (* Reset production and failure counters for the newly selected test *)
     CycleCount := 0;
@@ -206,7 +228,6 @@ IF HMI_Reset THEN
     RST(Stopped_By_User);
     RST(Failure_State);
     RST(ConsecFailTrip);
-    RST(HoldReason_Required);
 
     (* Reset counters and hold reason *)
     CycleCount := 0;
@@ -234,51 +255,31 @@ END_IF;
     A hold should be traceable, especially for future Ignition/database logging.
 *)
 
-IF Hold_Rise THEN
-
-    (*
-        If the technician already selected a valid hold reason,
-        immediately place the station on hold and stop the test.
-    *)
-    IF HoldReason_Valid THEN
-        SET(Hold_Latch);
-        RST(Run_Latch);
-
-    (*
-        If no valid hold reason was selected, do not place the station
-        fully on hold yet. Instead, ask the HMI to prompt for a reason.
-    *)
-    ELSE
-        SET(HoldReason_Required);
-    END_IF;
-
-END_IF;
-
 (*
-    If a hold was requested earlier but no reason was entered at that time,
-    this block waits until the technician enters a valid reason.
-
-    Once a valid reason appears, the station is placed on hold and
-    the "reason required" prompt can be cleared.
+    Pressing any hold-reason button on the HMI is the sole trigger for
+    entering hold. HoldReasonValid_Rise already confirms a fresh, valid
+    reason code was just written this scan, so latching here immediately
+    stops the test and lights the hold lamp (Held_State -> M303) in the
+    same scan the technician made the selection.
 *)
 
-IF HoldReason_Required AND HoldReason_Valid THEN
+IF HoldReasonValid_Rise THEN
     SET(Hold_Latch);
     RST(Run_Latch);
-    RST(HoldReason_Required);
 END_IF;
 
 (*
-    Off-hold releases the station from hold.
+    Clear Hold releases the station from hold once the issue is resolved.
 
-    It also clears the hold reason code so the next hold event requires
-    a fresh reason instead of accidentally reusing the previous one.
+    It also zeroes the hold reason code so the next hold event requires
+    a fresh reason instead of accidentally reusing the previous one, and
+    so Ignition sees the reason field go back to "none" the same scan
+    the station leaves hold.
 *)
 
-IF OffHold_Rise THEN
+IF ClearHold_Rise THEN
 
     RST(Hold_Latch);
-    RST(HoldReason_Required);
 
     HoldReason_Code := 0;
 
