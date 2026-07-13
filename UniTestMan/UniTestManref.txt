@@ -519,6 +519,43 @@ END_IF;
 
 
 (* ===================================================== *)
+(* ---------------- CYCLE WATCHDOG (STALL DETECTION) --- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Idle_State only looks at commanded state (Run_Latch, Hold_Latch, etc.),
+    not at whether the selected test FB is actually still producing cycles.
+
+    If a test FB's sequence gets physically stuck waiting on a sensor that
+    will never respond -- e.g. the air piston is pulled out of an exit
+    cycle test mid-run -- cycling stops for real, but nothing ever resets
+    Run_Latch, so Manager_Executing (and therefore Running_State) keeps
+    reporting "running" to the HMI/Ignition forever even though the
+    station is doing nothing.
+
+    This timer restarts every time a cycle actually completes (either
+    pass or fail). It only accumulates while the manager is trying to
+    execute and no pulse has arrived. If it accumulates for 5 seconds
+    straight, the test FB is considered stalled: drop Run_Latch so the
+    normal derived-state logic below correctly falls through to
+    Idle_State on this same scan.
+
+    5 seconds assumes every test's normal cycle time is comfortably under
+    that threshold. If a test is redesigned with a per-cycle time close to
+    or over 5 seconds, this will trip prematurely and needs to be revisited.
+*)
+
+CycleWatchdogInst(
+    IN := Manager_Executing AND NOT (CyclePass_Pulse OR CycleFail_Pulse),
+    PT := T#5S
+);
+
+IF CycleWatchdogInst.Q THEN
+    RST(Run_Latch);
+END_IF;
+
+
+(* ===================================================== *)
 (* ---------------- CPM / COMPLETION / NEXT PAUSE ------- *)
 (* ===================================================== *)
 (*
@@ -722,3 +759,26 @@ Test_Complete := Goal_Reached;
 *)
 
 HMI_EStop := EStop_Latch;
+
+
+(* ===================================================== *)
+(* ---------------- TEST SELECTION STATUS -------------- *)
+(* ===================================================== *)
+(*
+    Purpose:
+    Give the HMI one clean bit per test so each test-select button's
+    lamp/indicator can show which test is currently selected, even though
+    the buttons themselves are momentary word switches (they only pulse
+    a write to HMI_SelectedTest -- they have no inherent "stay lit" state).
+
+    Each bit stays ON for as long as that test is the selected one,
+    regardless of run/hold/pause/complete/idle state. This shows what is
+    loaded, not whether it is actively cycling -- Running_State already
+    covers that.
+*)
+
+TrimTest_Active    := (HMI_SelectedTest = 1);
+ExitTest_Active    := (HMI_SelectedTest = 2);
+QELTest_Active     := (HMI_SelectedTest = 4);
+MagLockTest_Active := (HMI_SelectedTest = 5);
+ChexitTest_Active  := (HMI_SelectedTest = 6);
