@@ -229,12 +229,13 @@ IF HMI_Reset THEN
     RST(Failure_State);
     RST(ConsecFailTrip);
 
+    (* tabling change of user-inputtables via. HMI_reset 07/15/26
     (* Reset counters and hold reason *)
     CycleCount := 0;
     FailtoRet := 0;
     ConsecutiveFailCnt := 0;
     HoldReason_Code := 0;
-
+    *)
 END_IF;
 
 
