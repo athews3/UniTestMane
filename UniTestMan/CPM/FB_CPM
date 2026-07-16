@@ -12,13 +12,27 @@ VAR
     LastCount     : DINT;
     Delta         : DINT;
     SecCounter    : DINT;
+    tOneSec       : TON;
+    PrevOneSec    : BOOL;
 END_VAR
 
 
-(* 1-second clock accumulation using FX5 system bit *)
-IF Enable AND FX5CPU.stSM.b1sClock THEN
+(* Free-running 1-second tick, self-oscillating per this project's existing
+   TON style (see SR_TrimCycle.txt tPreDelay/tValve): NOT tOneSec.Q re-arms
+   the timer the scan after it completes, so Q is a one-scan-wide pulse
+   every ~1s, independent of Enable; Enable only gates the increment below.
+   Previously this gated SecCounter directly on FX5CPU.stSM.b1sClock, an
+   unverified system bit (not present in workingglobvar.csv) whose documented
+   behavior is a LEVEL held ON ~0.5s / OFF ~0.5s each second, not a one-scan
+   pulse -- so SecCounter was incremented every scan for ~0.5s solid and
+   raced to 60 within a fraction of a real second instead of over 60 real
+   seconds, which made Delta/CPM read ~0 almost constantly. *)
+tOneSec(IN := NOT tOneSec.Q, PT := T#1S);
+
+IF Enable AND tOneSec.Q AND NOT PrevOneSec THEN
     SecCounter := SecCounter + 1;
 END_IF;
+PrevOneSec := tOneSec.Q;
 
 (* every 60 seconds *)
 IF SecCounter >= 60 THEN
