@@ -1,11 +1,17 @@
 (* NOTE: requires new locals in GX Works3's variable table (not shown in this
    plain-text export): failRetractRise, prevFailRetract : BOOL;
-   cycleDoneEdge, prevCycleDone : BOOL;
-   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL.
+   cycleDoneEdge, prevCycleDone, cycleFailed : BOOL;
+   and new VAR_OUTPUT: Pass_Pulse, Fail_Pulse : BOOL.
    The undeclared/orphaned M5 fail-limit trip and the direct FailtoRet write
    have been removed — the manager now owns fail counting via CycleFail_Pulse
    (see UniTestManref.txt's failure-tracking block). The dead D200 write has
-   been replaced with the actual CycleCount label so cycles now really count. *)
+   been replaced with the actual CycleCount label so cycles now really count.
+
+   cycleFailed latches when a fail-to-retract trips mid-sequence; the tail of
+   the sequence (tPowerBreak/tUnpowered/tReengage) still runs afterward so the
+   mechanism can reset, and previously that meant cycleDoneEdge would fire
+   and unconditionally count the attempt as a pass. cycleFailed makes that
+   cycle's eventual completion suppress CycleCount/Pass_Pulse instead. *)
 
 (* ---------------- Precondition / Start Delay ---------------- *)
 tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1s);
@@ -52,10 +58,11 @@ prevFailRetract := tFailRetract.Q;
 
 IF (failRetractRise AND X17 AND NOT M9 AND M4) THEN
     M16 := TRUE;
-    CycleFail_Pulse := TRUE;
+    Fail_Pulse := TRUE;
+    cycleFailed := TRUE;
 ELSE
     M16 := FALSE;
-    CycleFail_Pulse := FALSE;
+    Fail_Pulse := FALSE;
 END_IF;
 
 (* ---------------- Power Break ---------------- *)
@@ -95,13 +102,21 @@ END_IF;
 cycleDoneEdge := (tReengage.Q AND X17 AND M4) AND NOT prevCycleDone;
 prevCycleDone := (tReengage.Q AND X17 AND M4);
 
+(* CycleCount counts successful cycles only -- a cycle that tripped
+   fail-to-retract earlier in this same run must not also count as a pass
+   once the mechanism finishes resetting. *)
 IF cycleDoneEdge THEN
     M1 := TRUE;
-    CycleCount := CycleCount + 1;
-    CyclePass_Pulse := TRUE;
+    IF NOT cycleFailed THEN
+        CycleCount := CycleCount + 1;
+        Pass_Pulse := TRUE;
+    ELSE
+        Pass_Pulse := FALSE;
+    END_IF;
+    cycleFailed := FALSE;
 ELSE
     M1 := FALSE;
-    CyclePass_Pulse := FALSE;
+    Pass_Pulse := FALSE;
 END_IF;
 
 (* ---------------- Goal Reached ---------------- *)
