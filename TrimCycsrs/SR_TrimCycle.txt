@@ -1,3 +1,8 @@
+(* NOTE: requires new locals in GX Works3's variable table (not shown in this
+   plain-text export): cycleDoneEdge, prevCycleDone : BOOL;
+   valveTimeoutRise, prevValveTimeout : BOOL;
+   and new VAR_OUTPUT: Pass_Pulse, Fail_Pulse : BOOL. *)
+
 (* Pre-delay *)
 tPreDelay(IN := ((X0 OR tPreDelay.Q) AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#5s);
 
@@ -22,10 +27,38 @@ x0Fall := (NOT X0) AND prevX0;
 prevX0 := X0;
 
 
-(* Cycle complete *)
-IF (tValve.Q AND (NOT X0)) THEN
-    SET(M1);
+(* ---------------- Valve Timeout Detection (fail path) ---------------- *)
+(* tValve's own 5s preset IS the timeout window being reused here -- no new
+   TON is added. If tValve expires (T#5s) while X0 is still asserted, the
+   door never cleared/retracted within the allotted time and the cycle
+   failed, mirroring Chexit's tFailRetract pattern but against an existing
+   stage timer instead of a dedicated one. Edge-detected so Fail_Pulse is a
+   genuine one-scan pulse, not a level. *)
+valveTimeoutRise := (tValve.Q AND X0) AND NOT prevValveTimeout;
+prevValveTimeout := (tValve.Q AND X0);
+
+
+(* Cycle complete (one-scan pulse, not a permanent latch) *)
+cycleDoneEdge := (tValve.Q AND (NOT X0)) AND NOT prevCycleDone;
+prevCycleDone := (tValve.Q AND (NOT X0));
+
+(* AND NOT valveTimeoutRise is a defensive interlock, not just a byproduct of
+   X0 timing: CycleCount must never increment on the same scan Fail_Pulse
+   does, so this is made explicit rather than relying on the two edge
+   conditions happening to be mutually exclusive today. *)
+IF cycleDoneEdge AND NOT valveTimeoutRise THEN
+    M1 := TRUE;
     CycleCount := CycleCount + 1;
+    Pass_Pulse := TRUE;
+ELSE
+    M1 := FALSE;
+    Pass_Pulse := FALSE;
+END_IF;
+
+IF valveTimeoutRise THEN
+    Fail_Pulse := TRUE;
+ELSE
+    Fail_Pulse := FALSE;
 END_IF;
 
 
