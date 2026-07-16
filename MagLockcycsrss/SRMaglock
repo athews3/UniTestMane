@@ -1,6 +1,11 @@
 (* NOTE: requires new locals in GX Works3's variable table (not shown in this
    plain-text export): cycleDoneEdge, prevCycleDone : BOOL;
-   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL. *)
+   latchTimeoutRise, prevLatchTimeout : BOOL;
+   tLatchTimeout : TON;
+   and new VAR_OUTPUT: Pass_Pulse : BOOL; Fail_Pulse : BOOL.
+   Fail_Pulse was previously missing entirely from this FB's outputs -- only
+   Pass_Pulse existed -- so no cycle failure could ever be counted for this
+   test regardless of what happened on the machine. *)
 
 (* ---------------- Start + Self-hold ---------------- *)
 tStart(IN := ((X0 AND X17 AND NOT M2 AND M4) OR M21) AND NOT M1 AND M4, PT := T#1s);
@@ -86,19 +91,41 @@ ELSE
 END_IF;
 
 
+(* ---------------- Latch Timeout Detection (fail path) ---------------- *)
+(* tReset's own IN requires NOT X0 (door must clear) after the latch stage
+   trips. tLatch.Q self-holds via M22 once it fires, so if X0 never clears,
+   tReset never starts and the whole chain stalls indefinitely past tLatch.
+   This dedicated TON measures how long the latch stage has been waiting on
+   X0 to clear; if X0 is still asserted after this new 5s window, treat the
+   cycle as failed. Edge-detected so Fail_Pulse is a genuine one-scan pulse. *)
+tLatchTimeout(IN := (tLatch.Q AND X0 AND X17 AND M4), PT := T#5s);
+
+latchTimeoutRise := tLatchTimeout.Q AND NOT prevLatchTimeout;
+prevLatchTimeout := tLatchTimeout.Q;
+
+
 (* ---------------- Cycle Complete (one-scan pulse, not a permanent latch) ---------------- *)
 cycleDoneEdge := (tFinalize.Q AND X0 AND M4) AND NOT prevCycleDone;
 prevCycleDone := (tFinalize.Q AND X0 AND M4);
 
-IF cycleDoneEdge THEN
+(* AND NOT latchTimeoutRise is a defensive interlock, not just a byproduct of
+   X0 timing: CycleCount must never increment on the same scan Fail_Pulse
+   does, so this is made explicit rather than relying on the two edge
+   conditions happening to be mutually exclusive today. *)
+IF cycleDoneEdge AND NOT latchTimeoutRise THEN
     M1 := TRUE;
     CycleCount := CycleCount + 1;
-    CyclePass_Pulse := TRUE;
+    Pass_Pulse := TRUE;
 ELSE
     M1 := FALSE;
-    CyclePass_Pulse := FALSE;
+    Pass_Pulse := FALSE;
 END_IF;
-CycleFail_Pulse := FALSE;
+
+IF latchTimeoutRise THEN
+    Fail_Pulse := TRUE;
+ELSE
+    Fail_Pulse := FALSE;
+END_IF;
 
 
 (* ---------------- Goal Reached ---------------- *)
