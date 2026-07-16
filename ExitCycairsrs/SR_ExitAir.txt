@@ -7,9 +7,11 @@
      closerOpenLatch, closerCloseLatch : BOOL;
      mOpen, mClose, prevMClose         : BOOL;
      exitDoneCond, cycleDoneEdge, prevCycleDone : BOOL;
+     exitTimeoutCond, exitTimeoutRise, prevExitTimeout : BOOL;
      tCloserPreDelay, tCloserOpenHold, tCloserCloseHold : TON;
      tAirPreDelay, tAirCloseHold : TON;
-   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL.
+     tCloserOpenTimeout, tAirOpenTimeout : TON;
+   and new VAR_OUTPUT: Pass_Pulse, Fail_Pulse : BOOL.
    SR_ExitCloser.txt / ExitCloserInst are retired — this file now covers both
    sequences; the manager's CASE ID 3 branch has been removed. *)
 
@@ -43,6 +45,15 @@ IF UseCloser THEN
 
     exitDoneCond := (tCloserCloseHold.Q AND X17 AND M4);
 
+    (* ---------------- Closer Open Timeout Detection (fail path) ---------------- *)
+    (* closerOpenLatch (door reported open) self-holds once tCloserOpenHold
+       trips; tCloserCloseHold can't start without X1. If X1 never asserts
+       within this new 3s window after the open latch sets, the close
+       confirm sensor failed to respond -- treat as a failed cycle. *)
+    tCloserOpenTimeout(IN := (closerOpenLatch AND NOT X1 AND X17 AND M4), PT := T#3s);
+
+    exitTimeoutCond := tCloserOpenTimeout.Q;
+
 ELSE
 
     (* ---------------- Air branch (from SR_ExitAir.txt) ---------------- *)
@@ -68,22 +79,45 @@ ELSE
     exitDoneCond := (mClose AND NOT prevMClose AND X17 AND M4);
     prevMClose := mClose;
 
+    (* ---------------- Air Open Timeout Detection (fail path) ---------------- *)
+    (* mOpen is only ever driven true while NOT X1 holds (see its IF/ELSE
+       above), so it already encodes "commanded open, waiting on X1". If
+       mOpen stays commanded for a new 3s window without X1 ever asserting,
+       the close-confirm sensor failed to respond -- treat as a failed
+       cycle. tAirCloseHold itself can't detect this because its IN is X1
+       directly, so it can never even start running without X1 already true. *)
+    tAirOpenTimeout(IN := (mOpen AND NOT X1 AND X17 AND M4), PT := T#3s);
+
+    exitTimeoutCond := tAirOpenTimeout.Q;
+
 END_IF;
 
 
-(* ---------------- Shared cycle-complete / goal / pulses ---------------- *)
+(* ---------------- Shared cycle-complete / timeout / goal / pulses ---------------- *)
 cycleDoneEdge := exitDoneCond AND NOT prevCycleDone;
 prevCycleDone := exitDoneCond;
 
-IF cycleDoneEdge THEN
+exitTimeoutRise := exitTimeoutCond AND NOT prevExitTimeout;
+prevExitTimeout := exitTimeoutCond;
+
+(* AND NOT exitTimeoutRise is a defensive interlock, not just a byproduct of
+   X1 timing: CycleCount must never increment on the same scan Fail_Pulse
+   does, so this is made explicit rather than relying on the two edge
+   conditions happening to be mutually exclusive today. *)
+IF cycleDoneEdge AND NOT exitTimeoutRise THEN
     M1 := TRUE;
     CycleCount := CycleCount + 1;
-    CyclePass_Pulse := TRUE;
+    Pass_Pulse := TRUE;
 ELSE
     M1 := FALSE;
-    CyclePass_Pulse := FALSE;
+    Pass_Pulse := FALSE;
 END_IF;
-CycleFail_Pulse := FALSE;
+
+IF exitTimeoutRise THEN
+    Fail_Pulse := TRUE;
+ELSE
+    Fail_Pulse := FALSE;
+END_IF;
 
 
 (* ---------------- Goal reached ---------------- *)
