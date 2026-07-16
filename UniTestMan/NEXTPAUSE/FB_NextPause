@@ -9,9 +9,22 @@ VAR_OUTPUT
     Trigger       : BOOL;
 END_VAR
 
+VAR
+    Armed        : BOOL;
+    PrevSetpoint : DINT;
+END_VAR
+
+
+IF Setpoint <> PrevSetpoint THEN
+    Armed := TRUE;
+    Trigger := FALSE;
+END_IF;
+PrevSetpoint := Setpoint;
 
 IF Reset THEN
+    Armed := TRUE;
     Trigger := FALSE;
-ELSIF (Setpoint > 0) AND (CycleCount_In >= Setpoint) THEN
+ELSIF Armed AND (Setpoint > 0) AND (CycleCount_In >= Setpoint) THEN
     Trigger := TRUE;
+    Armed := FALSE;
 END_IF;
