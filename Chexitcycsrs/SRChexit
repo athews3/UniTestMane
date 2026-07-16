@@ -1,7 +1,7 @@
 (* NOTE: requires new locals in GX Works3's variable table (not shown in this
    plain-text export): cycleSamplePass, cycleSampleFail : BOOL;
    cycleDoneEdge, prevCycleDone : BOOL;
-   and new VAR_OUTPUT: CyclePass_Pulse, CycleFail_Pulse : BOOL.
+   and new VAR_OUTPUT: Pass_Pulse, Fail_Pulse : BOOL.
 
    Fixes in this pass:
    - Removed the "Heartbeat" block, which directly SET/RST device M3 — M3 is
@@ -103,15 +103,22 @@ Y2 := (M21 AND NOT Y0) OR (M33 AND NOT M1);     (* Close door *)
 cycleDoneEdge := (tClose2.Q AND X17 AND M4) AND NOT prevCycleDone;
 prevCycleDone := (tClose2.Q AND X17 AND M4);
 
+(* CycleCount now counts successful cycles only -- it must never increment on
+   the same scan as Fail_Pulse, so the increment is gated on cycleSamplePass
+   specifically rather than on cycleDoneEdge alone. Previously this counted
+   every completed attempt (pass or fail); a failed cycle no longer advances
+   CycleCount/CycleTarget/Goal_Reached or CPM throughput. *)
 IF cycleDoneEdge THEN
     M1 := TRUE;
-    CycleCount := CycleCount + 1;
-    CyclePass_Pulse := cycleSamplePass;
-    CycleFail_Pulse := cycleSampleFail;
+    Pass_Pulse := cycleSamplePass;
+    Fail_Pulse := cycleSampleFail;
+    IF cycleSamplePass THEN
+        CycleCount := CycleCount + 1;
+    END_IF;
 ELSE
     M1 := FALSE;
-    CyclePass_Pulse := FALSE;
-    CycleFail_Pulse := FALSE;
+    Pass_Pulse := FALSE;
+    Fail_Pulse := FALSE;
 END_IF;
 
 
