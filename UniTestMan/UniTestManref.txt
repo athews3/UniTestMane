@@ -647,13 +647,13 @@ HMI_Comp_Min   := COMPInst.Comp_Min;
 NextPause_Active := NextPauseInst.Trigger;
 
 (*
-    If the Next Pause point is reached at the same time a cycle completes,
-    stop the test and mark it as a user-style stop.
-
-    This stops between completed cycles instead of stopping mid-cycle.
+    NextPauseInst.Trigger is a level (see FB_NextPause): once the configured
+    cycle count is reached it stays set until the technician issues a Reset
+    or enters a new Setpoint, so no alignment with Cycle_Complete is needed
+    here -- same pattern as Goal_Reached below.
 *)
 
-IF NextPauseInst.Trigger AND Cycle_Complete THEN
+IF NextPauseInst.Trigger THEN
     RST(Run_Latch);
     SET(Stopped_By_User);
 END_IF;
