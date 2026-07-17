@@ -1,52 +1,22 @@
-FUNCTION_BLOCK FB_Completion
-VAR_INPUT
-    CycleCount_In  : DINT;
-    CycleTarget_In : DINT;
-    CPM_In         : DINT;
-END_VAR
-
-VAR_OUTPUT
-    RemainingCycles : DINT;
-    MinutesRemain   : DINT;
-
-    Comp_Year  : INT;
-    Comp_Month : INT;
-    Comp_Day   : INT;
-    Comp_Hour  : INT;
-    Comp_Min   : INT;
-END_VAR
-
-VAR
-    (* Current clock values, converted from unsigned-word to INT. *)
-    Year  : INT;
-    Month : INT;
-    Day   : INT;
-    Hour  : INT;
-    Min   : INT;
-
-    AddMin : DINT;
-END_VAR
-
-
 (* -------- READ SYSTEM CLOCK --------
-   uYear/uMonth/uDay/uHour/uMinute are NOT present in workingglobvar.csv
-   as of 2026-07-17 -- despite this comment previously claiming they were
-   confirmed, that has not actually been verified. Before this FB will
-   compile, confirm in GX Works3 whether this project's FX5 CPU exposes
-   clock data as built-in module labels (commonly
-   FX5CPU.stSD.stClock_Data.uYear, etc.) or whether user-defined global
-   labels must be created aliased to SD210-SD214, and update the names
-   below to match whichever is actually true for this project. FX5's RTC
-   data is plain binary (not BCD like FX3/Q-series), so only a WORD-to-INT
-   conversion should be needed either way, not BCDTOINT -- but WORD_TO_INT
-   itself has not been confirmed against this project's instruction
-   reference either. *)
+uYear/uMonth/uDay/uHour/uMinute are NOT present in workingglobvar.csv
+as of 2026-07-17 -- despite this comment previously claiming they were
+confirmed, that has not actually been verified. Before this FB will
+compile, confirm in GX Works3 whether this project's FX5 CPU exposes
+clock data as built-in module labels (commonly
+FX5CPU.stSD.stClock_Data.uYear, etc.) or whether user-defined global
+labels must be created aliased to SD210-SD214, and update the names
+below to match whichever is actually true for this project. FX5's RTC
+data is plain binary (not BCD like FX3/Q-series), so only a WORD-to-INT
+conversion should be needed either way, not BCDTOINT -- but WORD_TO_INT
+itself has not been confirmed against this project's instruction
+reference either. *)
 
-Year  := WORD_TO_INT(uYear);
-Month := WORD_TO_INT(uMonth);
-Day   := WORD_TO_INT(uDay);
-Hour  := WORD_TO_INT(uHour);
-Min   := WORD_TO_INT(uMinute);
+Year  := FX5CPU.stSD.stClock_Data.uYear;
+Month :=  FX5CPU.stSD.stClock_Data.uMonth;
+Day   :=  FX5CPU.stSD.stClock_Data.uDay;
+Hour  :=  FX5CPU.stSD.stClock_Data.uHour;
+Min   :=  FX5CPU.stSD.stClock_Data.uMinute;
 
 
 (* -------- CORE CALC -------- *)
@@ -54,7 +24,7 @@ RemainingCycles := CycleTarget_In - CycleCount_In;
 
 IF CPM_In > 0 THEN
     MinutesRemain := RemainingCycles / CPM_In;
-ELSE
+	ELSE
     MinutesRemain := 0;
 END_IF;
 
@@ -79,23 +49,23 @@ Hour := Hour MOD 24;
 (* Simplified month length handling *)
 CASE Month OF
     1,3,5,7,8,10,12:
-        WHILE Day > 31 DO
-            Day := Day - 31;
-            Month := Month + 1;
-        END_WHILE;
+	WHILE Day > 31 DO
+		Day := Day - 31;
+		Month := Month + 1;
+	END_WHILE;
 
     4,6,9,11:
-        WHILE Day > 30 DO
-            Day := Day - 30;
-            Month := Month + 1;
-        END_WHILE;
+	WHILE Day > 30 DO
+		Day := Day - 30;
+		Month := Month + 1;
+	END_WHILE;
 
     2:
-        (* No leap year handling – industrial simplification *)
-        WHILE Day > 28 DO
-            Day := Day - 28;
-            Month := Month + 1;
-        END_WHILE;
+	(* No leap year handling – industrial simplification *)
+	WHILE Day > 28 DO
+		Day := Day - 28;
+		Month := Month + 1;
+	END_WHILE;
 END_CASE;
 
 
