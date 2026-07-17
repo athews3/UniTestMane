@@ -235,7 +235,6 @@ IF HMI_Reset THEN
     FailtoRet := 0;
     ConsecutiveFailCnt := 0;
     HoldReason_Code := 0;
-    *)
 END_IF;
 
 
@@ -636,13 +635,13 @@ IF HMI_CPM > 0 THEN
     HMI_MinutesRemain := 0;
 END_IF;
 
-(*
+
 HMI_Comp_Year  := COMPInst.Comp_Year;
 HMI_Comp_Month := COMPInst.Comp_Month;
 HMI_Comp_Day   := COMPInst.Comp_Day;
 HMI_Comp_Hour  := COMPInst.Comp_Hour;
 HMI_Comp_Min   := COMPInst.Comp_Min;
-*)
+
 
 NextPause_Active := NextPauseInst.Trigger;
 
