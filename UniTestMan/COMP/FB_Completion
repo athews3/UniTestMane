@@ -1,22 +1,37 @@
 (* -------- READ SYSTEM CLOCK --------
-uYear/uMonth/uDay/uHour/uMinute are NOT present in workingglobvar.csv
-as of 2026-07-17 -- despite this comment previously claiming they were
-confirmed, that has not actually been verified. Before this FB will
-compile, confirm in GX Works3 whether this project's FX5 CPU exposes
-clock data as built-in module labels (commonly
-FX5CPU.stSD.stClock_Data.uYear, etc.) or whether user-defined global
-labels must be created aliased to SD210-SD214, and update the names
-below to match whichever is actually true for this project. FX5's RTC
-data is plain binary (not BCD like FX3/Q-series), so only a WORD-to-INT
-conversion should be needed either way, not BCDTOINT -- but WORD_TO_INT
-itself has not been confirmed against this project's instruction
-reference either. *)
+Year and Comp_Year are now declared M+FX5UCPU_Clock_Data (a structured
+type) instead of plain INT. This is the actual rebuild blocker: structured
+types have no arithmetic operators in ST, so every line further down that
+used to do "Year := Year + 1", WORD-to-INT-style scalar reads, MOD/DIV,
+etc. directly on Year/Month/Day/Hour/Min fails to compile once Year holds
+a whole struct instead of a number -- a struct can only be assigned whole
+(struct := struct of the identical type) or accessed member-by-member, it
+cannot be used as a rollover accumulator.
 
-Year  := FX5CPU.stSD.stClock_Data.uYear;
-Month :=  FX5CPU.stSD.stClock_Data.uMonth;
-Day   :=  FX5CPU.stSD.stClock_Data.uDay;
-Hour  :=  FX5CPU.stSD.stClock_Data.uHour;
-Min   :=  FX5CPU.stSD.stClock_Data.uMinute;
+Fix: read the whole current-clock struct into Year in one shot (valid --
+same type on both sides), then peel out scalar working copies (wYear,
+wMonth, wDay, wHour, wMin) for all the arithmetic below, and only touch
+Comp_Year again at the very end to pack the results back member-by-member.
+
+wYear/wMonth/wDay/wHour/wMin/AddMin must exist as plain INT locals in
+GX Works3's variable table (not shown in this plain-text export -- same
+convention already used elsewhere in this project, see SRQELcyc/SRChexit
+headers). uYear/uMonth/uDay/uHour/uMinute member names below are assumed
+from Mitsubishi's usual stClock_Data member convention -- NOT verified
+against this project's actual M+FX5UCPU_Clock_Data definition. Check GX
+Works3's label tree for the real member names/case before trusting this
+compiles, and confirm FX5CPU.stSD.stClock_Data itself is still the right
+source now that Year is struct-typed (whole-struct assignment requires
+the source to be the exact same M+FX5UCPU_Clock_Data type, not just a
+compatible set of WORD fields). *)
+
+Year := FX5CPU.stSD.stClock_Data;
+
+wYear  := WORD_TO_INT(Year.uYear);
+wMonth := WORD_TO_INT(Year.uMonth);
+wDay   := WORD_TO_INT(Year.uDay);
+wHour  := WORD_TO_INT(Year.uHour);
+wMin   := WORD_TO_INT(Year.uMinute);
 
 
 (* -------- CORE CALC -------- *)
@@ -33,52 +48,71 @@ AddMin := MinutesRemain;
 
 (* -------- ADD MINUTES -------- *)
 
-Min := Min + AddMin;
+wMin := wMin + AddMin;
 
 (* Minute rollover *)
-Hour := Hour + (Min / 60);
-Min  := Min MOD 60;
+wHour := wHour + (wMin / 60);
+wMin  := wMin MOD 60;
 
 (* Hour rollover *)
-Day := Day + (Hour / 24);
-Hour := Hour MOD 24;
+wDay  := wDay + (wHour / 24);
+wHour := wHour MOD 24;
 
 
 (* -------- DAY/MONTH/YEAR HANDLING -------- *)
 
 (* Simplified month length handling *)
-CASE Month OF
+CASE wMonth OF
     1,3,5,7,8,10,12:
-	WHILE Day > 31 DO
-		Day := Day - 31;
-		Month := Month + 1;
+	WHILE wDay > 31 DO
+		wDay := wDay - 31;
+		wMonth := wMonth + 1;
 	END_WHILE;
 
     4,6,9,11:
-	WHILE Day > 30 DO
-		Day := Day - 30;
-		Month := Month + 1;
+	WHILE wDay > 30 DO
+		wDay := wDay - 30;
+		wMonth := wMonth + 1;
 	END_WHILE;
 
     2:
 	(* No leap year handling – industrial simplification *)
-	WHILE Day > 28 DO
-		Day := Day - 28;
-		Month := Month + 1;
+	WHILE wDay > 28 DO
+		wDay := wDay - 28;
+		wMonth := wMonth + 1;
 	END_WHILE;
 END_CASE;
 
 
 (* Month rollover *)
-WHILE Month > 12 DO
-    Month := Month - 12;
-    Year := Year + 1;
+WHILE wMonth > 12 DO
+    wMonth := wMonth - 12;
+    wYear := wYear + 1;
 END_WHILE;
 
 
-(* -------- OUTPUT -------- *)
-Comp_Year  := Year;
-Comp_Month := Month;
-Comp_Day   := Day;
-Comp_Hour  := Hour;
-Comp_Min   := Min;
+(* -------- OUTPUT --------
+   Per CLAUDE.md 6.2, Comp_Year/Comp_Month/Comp_Day/Comp_Hour/Comp_Min are
+   five required outputs -- Comp_Year being struct-typed does not retire
+   the other four. Comp_Year (M+FX5UCPU_Clock_Data) is packed first,
+   member-by-member (INT_TO_WORD, mirroring the WORD_TO_INT used on the
+   way in) -- it is the single canonical completion-date struct, built
+   directly from CPU time the same way the RTC itself was read as a whole
+   struct at the top of this FB, rather than from scattered registers.
+
+   Comp_Month/Comp_Day/Comp_Hour/Comp_Min are then derived FROM that
+   struct via structured (member) access -- WORD_TO_INT(Comp_Year.uMonth),
+   etc. -- not from a second, independent copy of wMonth/wDay/wHour/wMin.
+   That keeps Comp_Year as the one source of truth; the four scalar
+   outputs are just a structured view onto it for whatever still needs a
+   plain INT (e.g. the existing HMI_Comp_* copy-out in UniTestManref.txt). *)
+Comp_Year.uYear   := INT_TO_WORD(wYear);
+Comp_Year.uMonth  := INT_TO_WORD(wMonth);
+Comp_Year.uDay    := INT_TO_WORD(wDay);
+Comp_Year.uHour   := INT_TO_WORD(wHour);
+Comp_Year.uMinute := INT_TO_WORD(wMin);
+
+Comp_Month := WORD_TO_INT(Comp_Year.uMonth);
+Comp_Day   := WORD_TO_INT(Comp_Year.uDay);
+Comp_Hour  := WORD_TO_INT(Comp_Year.uHour);
+Comp_Min   := WORD_TO_INT(Comp_Year.uMinute);
