@@ -1,37 +1,25 @@
 (* -------- READ SYSTEM CLOCK --------
-Year and Comp_Year are now declared M+FX5UCPU_Clock_Data (a structured
-type) instead of plain INT. This is the actual rebuild blocker: structured
-types have no arithmetic operators in ST, so every line further down that
-used to do "Year := Year + 1", WORD-to-INT-style scalar reads, MOD/DIV,
-etc. directly on Year/Month/Day/Hour/Min fails to compile once Year holds
-a whole struct instead of a number -- a struct can only be assigned whole
-(struct := struct of the identical type) or accessed member-by-member, it
-cannot be used as a rollover accumulator.
+Reworked to address the FX5 CPU's RTC directly via special data registers
+(SD210-SD214) instead of the M+FX5UCPU_Clock_Data struct -- struct pack/
+unpack (INT_TO_WORD/WORD_TO_INT member juggling) added complexity without
+changing the actual algorithm, which is simply:
 
-Fix: read the whole current-clock struct into Year in one shot (valid --
-same type on both sides), then peel out scalar working copies (wYear,
-wMonth, wDay, wHour, wMin) for all the arithmetic below, and only touch
-Comp_Year again at the very end to pack the results back member-by-member.
+    cycle time  = 1 / CPM        (expressed here as MinutesRemain = cycles / CPM)
+    duration    = cycle time * cycles remaining
+    completion  = current PLC clock + duration
 
-wYear/wMonth/wDay/wHour/wMin/AddMin must exist as plain INT locals in
-GX Works3's variable table (not shown in this plain-text export -- same
-convention already used elsewhere in this project, see SRQELcyc/SRChexit
-headers). uYear/uMonth/uDay/uHour/uMinute member names below are assumed
-from Mitsubishi's usual stClock_Data member convention -- NOT verified
-against this project's actual M+FX5UCPU_Clock_Data definition. Check GX
-Works3's label tree for the real member names/case before trusting this
-compiles, and confirm FX5CPU.stSD.stClock_Data itself is still the right
-source now that Year is struct-typed (whole-struct assignment requires
-the source to be the exact same M+FX5UCPU_Clock_Data type, not just a
-compatible set of WORD fields). *)
+SD210-SD214 = Year/Month/Day/Hour/Minute, plain binary WORDs on FX5 (not
+BCD like FX3/Q-series) -- addresses assumed from Mitsubishi's standard FX5
+special-register table, NOT verified against this project's actual GX
+Works3 device/label list. Confirm SD210 is really "current year" on this
+CPU (and that WORD_TO_INT is the correct/available conversion) before
+trusting this compiles or reads the right values. *)
 
-Year := FX5CPU.stSD.stClock_Data;
-
-wYear  := WORD_TO_INT(Year.uYear);
-wMonth := WORD_TO_INT(Year.uMonth);
-wDay   := WORD_TO_INT(Year.uDay);
-wHour  := WORD_TO_INT(Year.uHour);
-wMin   := WORD_TO_INT(Year.uMinute);
+wYear  := WORD_TO_INT(SD210);
+wMonth := WORD_TO_INT(SD211);
+wDay   := WORD_TO_INT(SD212);
+wHour  := WORD_TO_INT(SD213);
+wMin   := WORD_TO_INT(SD214);
 
 
 (* -------- CORE CALC -------- *)
@@ -43,7 +31,13 @@ IF CPM_In > 0 THEN
     MinutesRemain := 0;
 END_IF;
 
-AddMin := MinutesRemain;
+(* RemainingCycles/MinutesRemain are DINT (CycleCount_In/CycleTarget_In/
+   CPM_In are DINT, matching their global sources); wMin is INT (SD214 is
+   a plain WORD register). DINT_TO_INT makes the narrowing explicit --
+   this assumes total minutes-remaining always fits in INT range (+-32767).
+   If a test's remaining duration can exceed ~22 days worth of minutes,
+   this will silently truncate; flag if that's a real possibility. *)
+AddMin := DINT_TO_INT(MinutesRemain);
 
 
 (* -------- ADD MINUTES -------- *)
@@ -92,27 +86,10 @@ END_WHILE;
 
 
 (* -------- OUTPUT --------
-   Per CLAUDE.md 6.2, Comp_Year/Comp_Month/Comp_Day/Comp_Hour/Comp_Min are
-   five required outputs -- Comp_Year being struct-typed does not retire
-   the other four. Comp_Year (M+FX5UCPU_Clock_Data) is packed first,
-   member-by-member (INT_TO_WORD, mirroring the WORD_TO_INT used on the
-   way in) -- it is the single canonical completion-date struct, built
-   directly from CPU time the same way the RTC itself was read as a whole
-   struct at the top of this FB, rather than from scattered registers.
-
-   Comp_Month/Comp_Day/Comp_Hour/Comp_Min are then derived FROM that
-   struct via structured (member) access -- WORD_TO_INT(Comp_Year.uMonth),
-   etc. -- not from a second, independent copy of wMonth/wDay/wHour/wMin.
-   That keeps Comp_Year as the one source of truth; the four scalar
-   outputs are just a structured view onto it for whatever still needs a
-   plain INT (e.g. the existing HMI_Comp_* copy-out in UniTestManref.txt). *)
-Comp_Year.uYear   := INT_TO_WORD(wYear);
-Comp_Year.uMonth  := INT_TO_WORD(wMonth);
-Comp_Year.uDay    := INT_TO_WORD(wDay);
-Comp_Year.uHour   := INT_TO_WORD(wHour);
-Comp_Year.uMinute := INT_TO_WORD(wMin);
-
-Comp_Month := WORD_TO_INT(Comp_Year.uMonth);
-Comp_Day   := WORD_TO_INT(Comp_Year.uDay);
-Comp_Hour  := WORD_TO_INT(Comp_Year.uHour);
-Comp_Min   := WORD_TO_INT(Comp_Year.uMinute);
+   No struct anymore -- Comp_Year/Comp_Month/Comp_Day/Comp_Hour/Comp_Min
+   are all plain INT, assigned directly from the working scalars. *)
+Comp_Year  := wYear;
+Comp_Month := wMonth;
+Comp_Day   := wDay;
+Comp_Hour  := wHour;
+Comp_Min   := wMin;
