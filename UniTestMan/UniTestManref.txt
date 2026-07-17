@@ -585,20 +585,18 @@ Enable := Manager_Executing
 (*
 COMPInst estimates the projected completion date/time.
 
-TABLED: FB_Completion depends on RTC label wiring (uYear/uMonth/
-uDay/uHour/uMinute + WORD_TO_INT) that has not been verified
-against this CPU's instruction set yet. Call is commented out
-below until that is resolved -- see the simple minutes-remaining
-stand-in a few lines down.
+Re-enabled 2026-07-17: FB_Completion now compiles (Year/Comp_Year are
+M+FX5UCPU_Clock_Data structs, see CLAUDE.md 6.2). RTC label wiring
+(FX5CPU.stSD.stClock_Data + .uYear/.uMonth/.uDay/.uHour/.uMinute) is
+still UNVERIFIED against this project's actual GX Works3 label tree
+(CLAUDE.md 6.4 item 1) -- confirm before trusting this at runtime.
 *)
 
-(*
 COMPInst(
 CycleCount_In  := CycleCount,
 CycleTarget_In := CycleTarget,
 CPM_In         := CPMInst.CPM
 );
-*)
 
 (*
 NextPauseInst checks whether the station has reached the next configured
@@ -623,20 +621,14 @@ These are the values the HMI displays and Ignition may eventually read.
 
 HMI_CPM := CPMInst.CPM;
 
-(*
-Simple remaining-time proof of concept, standing in for the
-tabled completion-date estimate. One technician-facing value --
-estimated minutes remaining -- driven by CPM. No RTC, no
-calendar rollover, no FB call.
-*)
-IF HMI_CPM > 0 THEN
-    HMI_MinutesRemain := (CycleTarget - CycleCount) / HMI_CPM;
-	ELSE
-    HMI_MinutesRemain := 0;
-END_IF;
-
-
-HMI_Comp_Year  := COMPInst.Comp_Year;
+(* Comp_Year is the canonical M+FX5UCPU_Clock_Data struct -- only Year
+   needs struct-member access since it has no separate plain-INT output.
+   Comp_Month/Comp_Day/Comp_Hour/Comp_Min are FB_Completion's own direct
+   INT outputs (derived from Comp_Year internally, see CLAUDE.md 6.2) --
+   no need to re-derive them here from struct members. HMI_MinutesRemain
+   (the CPM-only stand-in used while COMPInst was tabled) is retired now
+   that the real completion date is wired back in. *)
+HMI_Comp_Year  := WORD_TO_DINT(COMPInst.Comp_Year.uYear);
 HMI_Comp_Month := COMPInst.Comp_Month;
 HMI_Comp_Day   := COMPInst.Comp_Day;
 HMI_Comp_Hour  := COMPInst.Comp_Hour;
