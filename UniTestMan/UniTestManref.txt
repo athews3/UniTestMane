@@ -621,18 +621,15 @@ These are the values the HMI displays and Ignition may eventually read.
 
 HMI_CPM := CPMInst.CPM;
 
-(* Comp_Year is the canonical M+FX5UCPU_Clock_Data struct -- only Year
-   needs struct-member access since it has no separate plain-INT output.
-   Comp_Month/Comp_Day/Comp_Hour/Comp_Min are FB_Completion's own direct
-   INT outputs (derived from Comp_Year internally, see CLAUDE.md 6.2) --
-   no need to re-derive them here from struct members. HMI_MinutesRemain
-   (the CPM-only stand-in used while COMPInst was tabled) is retired now
-   that the real completion date is wired back in. *)
-HMI_Comp_Year  := WORD_TO_DINT(COMPInst.Comp_Year.uYear);
-HMI_Comp_Month := COMPInst.Comp_Month;
-HMI_Comp_Day   := COMPInst.Comp_Day;
-HMI_Comp_Hour  := COMPInst.Comp_Hour;
-HMI_Comp_Min   := COMPInst.Comp_Min;
+(* FB_Completion no longer uses the M+FX5UCPU_Clock_Data struct -- it now
+   reads the RTC directly from SD210-SD214 and Comp_Year/Month/Day/Hour/Min
+   are all plain INT outputs. INT_TO_DINT makes the widen into the DINT
+   HMI globals explicit, matching this project's conversion convention. *)
+HMI_Comp_Year  := INT_TO_DINT(COMPInst.Comp_Year);
+HMI_Comp_Month := INT_TO_DINT(COMPInst.Comp_Month);
+HMI_Comp_Day   := INT_TO_DINT(COMPInst.Comp_Day);
+HMI_Comp_Hour  := INT_TO_DINT(COMPInst.Comp_Hour);
+HMI_Comp_Min   := INT_TO_DINT(COMPInst.Comp_Min);
 
 
 NextPause_Active := NextPauseInst.Trigger;
