@@ -29,14 +29,18 @@ END_VAR
 
 
 (* -------- READ SYSTEM CLOCK --------
-   Sourced directly from the CPU's built-in Clock Data global labels
-   (uYear, uMonth, uDay, uHour, uMinute -- all WORD, confirmed in the
-   GX Works3 module label list). These replace the old TRD D8000 +
-   BCD-register approach: the values here are already plain binary,
-   not BCD, so only a WORD-to-INT conversion is needed, not BCDTOINT.
-   WORD_TO_INT is a standard numeric conversion, not a datetime
-   function, but has not been confirmed against this project's
-   instruction reference -- verify if GX Works3 flags it. *)
+   uYear/uMonth/uDay/uHour/uMinute are NOT present in workingglobvar.csv
+   as of 2026-07-17 -- despite this comment previously claiming they were
+   confirmed, that has not actually been verified. Before this FB will
+   compile, confirm in GX Works3 whether this project's FX5 CPU exposes
+   clock data as built-in module labels (commonly
+   FX5CPU.stSD.stClock_Data.uYear, etc.) or whether user-defined global
+   labels must be created aliased to SD210-SD214, and update the names
+   below to match whichever is actually true for this project. FX5's RTC
+   data is plain binary (not BCD like FX3/Q-series), so only a WORD-to-INT
+   conversion should be needed either way, not BCDTOINT -- but WORD_TO_INT
+   itself has not been confirmed against this project's instruction
+   reference either. *)
 
 Year  := WORD_TO_INT(uYear);
 Month := WORD_TO_INT(uMonth);
