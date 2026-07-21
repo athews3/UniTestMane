@@ -2,7 +2,6 @@ FUNCTION_BLOCK FB_NextPause
 VAR_INPUT
     CycleCount_In : DINT;
     Setpoint      : DINT;
-    Reset         : BOOL;
 END_VAR
 
 VAR_OUTPUT
@@ -10,21 +9,8 @@ VAR_OUTPUT
 END_VAR
 
 VAR
-    Armed        : BOOL;
     PrevSetpoint : DINT;
 END_VAR
 
 
-IF Setpoint <> PrevSetpoint THEN
-    Armed := TRUE;
-    Trigger := FALSE;
-END_IF;
-PrevSetpoint := Setpoint;
-
-IF Reset THEN
-    Armed := TRUE;
-    Trigger := FALSE;
-ELSIF Armed AND (Setpoint > 0) AND (CycleCount_In >= Setpoint) THEN
-    Trigger := TRUE;
-    Armed := FALSE;
-END_IF;
+Trigger := (Setpoint > 0) AND (CycleCount_In >= Setpoint);
