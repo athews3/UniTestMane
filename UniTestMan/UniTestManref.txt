@@ -587,9 +587,7 @@ CPMInst(
 
     TABLED: FB_Completion depends on RTC label wiring (uYear/uMonth/
     uDay/uHour/uMinute + WORD_TO_INT) that has not been verified
-    against this CPU's instruction set yet. Call is commented out
-    below until that is resolved -- see the simple minutes-remaining
-    stand-in a few lines down.
+    against this CPU's instruction set yet. 
 *)
 
 (*
