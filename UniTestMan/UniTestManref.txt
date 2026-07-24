@@ -321,7 +321,7 @@ Manager_Executing :=
 Run_Latch
 AND NOT Goal_Reached
 AND NOT Hold_Latch
-AND X17
+AND X17;
 
 
 
@@ -672,7 +672,7 @@ AND NOT Stopped_By_User
 AND NOT Goal_Reached
 AND NOT Hold_Latch
 AND NOT Paused_State
-AND NOT Failure_State
+AND NOT Failure_State;
 
 (*
 Test_Complete drives the HMI complete lamp.
