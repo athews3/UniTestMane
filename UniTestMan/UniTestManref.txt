@@ -158,7 +158,6 @@ IF (HMI_SelectedTest <> LastTest) THEN
     (* Clear operator/admin/fault states *)
     RST(Hold_Latch);
     RST(Stopped_By_User);
-    RST(Failure_State);
     RST(ConsecFailTrip);
 
     (* Reset production and failure counters for the newly selected test *)
@@ -282,11 +281,8 @@ IF StartStop_Rise THEN
 		- the consecutive failure trip has not occurred
         *)
         IF (NOT Goal_Reached)
-			AND (NOT EStop_Latch)
 			AND X17
-			AND (NOT Hold_Latch)
-			AND (NOT Failure_State)
-			AND (NOT ConsecFailTrip) THEN
+			AND (NOT Hold_Latch) THEN
 
             SET(Run_Latch);
             RST(Internal_Stop);
@@ -325,10 +321,8 @@ Manager_Executing :=
 Run_Latch
 AND NOT Goal_Reached
 AND NOT Hold_Latch
-AND NOT Failure_State
-AND NOT ConsecFailTrip
 AND X17
-AND NOT EStop_Latch;
+
 
 
 (* ===================================================== *)
@@ -448,7 +442,7 @@ the running condition.
 
 IF CyclePass_Pulse AND CycleFail_Pulse THEN
 
-    SET(Failure_State);
+    RST(Run_Latch);
 
 END_IF;
 
@@ -461,9 +455,7 @@ This stops the test and requires operator/technician intervention.
 IF ConsecutiveFailCnt >= 5 THEN
 
     SET(ConsecFailTrip);
-    SET(Failure_State);
-    SET(Internal_Stop);
-    RST(Run_Latch);
+	RST(Run_Latch);
 
 END_IF;
 
@@ -665,10 +657,7 @@ Stopped_By_User
 AND NOT Run_Latch
 AND NOT Goal_Reached
 AND NOT Hold_Latch
-AND NOT Failure_State
-AND NOT ConsecFailTrip
-AND X17
-AND NOT EStop_Latch;
+AND X17;
 
 (*
 Idle_State means the station is not running, not held, not paused,
@@ -684,7 +673,6 @@ AND NOT Goal_Reached
 AND NOT Hold_Latch
 AND NOT Paused_State
 AND NOT Failure_State
-AND NOT EStop_Latch;
 
 (*
 Test_Complete drives the HMI complete lamp.
