@@ -574,7 +574,7 @@ HMI_Comp_Month := COMPInst.Comp_Month;
 HMI_Comp_Day   := COMPInst.Comp_Day;
 HMI_Comp_Hour  := COMPInst.Comp_Hour;
 HMI_Comp_Min   := COMPInst.Comp_Min;
-
+*)
 
 NextPause_Active := NextPauseInst.Trigger;
 
