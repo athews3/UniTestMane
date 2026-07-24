@@ -190,47 +190,6 @@ a selection change on the next scan.
 
 LastTest := HMI_SelectedTest;
 
-
-(* ===================================================== *)
-(* ---------------- RESET ------------------------------ *)
-(* ===================================================== *)
-(*
-Purpose:
-HMI_Reset returns the selected station/test to a clean starting state.
-
-Unlike changing tests, this reset does not change which test is selected.
-It clears the current test's progress, stops execution, and clears active
-hold/failure/completion states.
-
-This is the technician's normal way to recover from stopped/faulted states.
-*)
-
-IF HMI_Reset THEN
-
-    (* Stop execution and clear common cycle/completion state *)
-    RST(Run_Latch);
-    RST(Cycle_Complete);
-    RST(Goal_Reached);
-    RST(Internal_Stop);
-
-    (* Clear configured pause point *)
-    NextPause_Setpoint := 0;
-
-    (* Clear hold, stop, and failure-related states *)
-    RST(Hold_Latch);
-    RST(Stopped_By_User);
-    RST(Failure_State);
-    RST(ConsecFailTrip);
-
-    (* tabling change of user-inputtables via. HMI_reset 07/15/26
-    (* Reset counters and hold reason *)
-    CycleCount := 0;
-    FailtoRet := 0;
-    ConsecutiveFailCnt := 0;
-    HoldReason_Code := 0;
-END_IF;
-
-
 (* ===================================================== *)
 (* ---------------- HOLD / OFF-HOLD -------------------- *)
 (* ===================================================== *)
