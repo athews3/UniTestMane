@@ -95,34 +95,28 @@ the system remains stopped until the operator presses Reset.
 *)
 
 IF NOT X17 THEN
-    SET(EStop_Latch);     (* Remember that an E-stop/permissive fault occurred *)
-    RST(Run_Latch);       (* Immediately stop test execution *)
-    SET(Internal_Stop);   (* Mark that the system was stopped by control logic *)
-END_IF;
 
-(*
-If the E-stop latch is active, force the machine to remain stopped.
+    SET(EStop_Latch);
 
-This protects against auto-restart after the physical permissive returns.
-The operator must intentionally reset the condition before restarting.
-*)
-
-IF EStop_Latch THEN
     RST(Run_Latch);
+
     SET(Internal_Stop);
+
 END_IF;
 
 (*
-Reset clears the E-stop latch only if the hardware permissive X17 is healthy.
+The physical air/reset system outside the PLC owns recovery.
 
-This prevents the operator from clearing the E-stop state while the actual
-safety/permissive input is still OFF.
+Once the permissive returns, the PLC clears the indication
+automatically. The technician intentionally resumes testing
+with Start/Stop; there is no software reset step.
 *)
 
-IF HMI_Reset AND X17 THEN
-    RST(EStop_Latch);
-END_IF;
+IF X17 THEN
 
+    RST(EStop_Latch);
+
+END_IF;
 
 (* ===================================================== *)
 (* ---------------- TEST CHANGE ------------------------ *)
