@@ -323,7 +323,44 @@ AND NOT Goal_Reached
 AND NOT Hold_Latch
 AND X17;
 
+(* ===================================================== *)
+(* ---------------- OUTPUT SAFING ---------------------- *)
+(* ===================================================== *)
+(*
+Purpose:
 
+The manager owns station-level execution authority.
+
+If the manager is not executing, all test outputs must be forced
+to a known safe OFF state regardless of which test was previously
+selected or what step that test FB was halted on.
+
+This prevents outputs remaining energized during:
+
+- Idle
+- Stopped
+- Complete
+- Hold
+- E-Stop
+- Watchdog stop
+- NextPause stop
+- Test change
+
+Every output capable of actuating hardware must be included here.
+*)
+
+IF NOT Manager_Executing THEN
+
+    Y0 := FALSE;
+    Y1 := FALSE;
+    Y2 := FALSE;
+    Y3 := FALSE;
+    Y4 := FALSE;
+    Y5 := FALSE;
+
+    (* Add all remaining hardware outputs used by any test *)
+
+END_IF;
 
 (* ===================================================== *)
 (* ---------------- EXECUTION -------------------------- *)
