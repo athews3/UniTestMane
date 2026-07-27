@@ -695,8 +695,7 @@ AND NOT Run_Latch
 AND NOT Goal_Reached
 AND NOT Hold_Latch
 AND NOT Failure_State
-AND NOT ConsecFailTrip
-AND NOT EStop_Latch;
+AND NOT ConsecFailTrip;
 
 
 (*
