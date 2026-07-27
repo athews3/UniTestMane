@@ -690,11 +690,14 @@ This excludes:
 *)
 
 Paused_State :=
-Stopped_By_User
+(Stopped_By_User OR NOT x17)
 AND NOT Run_Latch
 AND NOT Goal_Reached
 AND NOT Hold_Latch
-AND X17;
+AND NOT Failure_State
+AND NOT ConsecFailTrip
+AND NOT EStop_Latch;
+
 
 (*
 Idle_State means the station is not running, not held, not paused,
