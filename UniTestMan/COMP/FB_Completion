@@ -1,0 +1,95 @@
+(* -------- READ SYSTEM CLOCK --------
+Reworked to address the FX5 CPU's RTC directly via special data registers
+(SD210-SD214) instead of the M+FX5UCPU_Clock_Data struct -- struct pack/
+unpack (INT_TO_WORD/WORD_TO_INT member juggling) added complexity without
+changing the actual algorithm, which is simply:
+
+    cycle time  = 1 / CPM        (expressed here as MinutesRemain = cycles / CPM)
+    duration    = cycle time * cycles remaining
+    completion  = current PLC clock + duration
+
+SD210-SD214 = Year/Month/Day/Hour/Minute, plain binary WORDs on FX5 (not
+BCD like FX3/Q-series) -- addresses assumed from Mitsubishi's standard FX5
+special-register table, NOT verified against this project's actual GX
+Works3 device/label list. Confirm SD210 is really "current year" on this
+CPU (and that WORD_TO_INT is the correct/available conversion) before
+trusting this compiles or reads the right values. *)
+
+wYear  := WORD_TO_INT(SD210);
+wMonth := WORD_TO_INT(SD211);
+wDay   := WORD_TO_INT(SD212);
+wHour  := WORD_TO_INT(SD213);
+wMin   := WORD_TO_INT(SD214);
+
+
+(* -------- CORE CALC -------- *)
+RemainingCycles := CycleTarget_In - CycleCount_In;
+
+IF CPM_In > 0 THEN
+    MinutesRemain := RemainingCycles / CPM_In;
+	ELSE
+    MinutesRemain := 0;
+END_IF;
+
+(* RemainingCycles/MinutesRemain are DINT (CycleCount_In/CycleTarget_In/
+   CPM_In are DINT, matching their global sources); wMin is INT (SD214 is
+   a plain WORD register). DINT_TO_INT makes the narrowing explicit --
+   this assumes total minutes-remaining always fits in INT range (+-32767).
+   If a test's remaining duration can exceed ~22 days worth of minutes,
+   this will silently truncate; flag if that's a real possibility. *)
+AddMin := DINT_TO_INT(MinutesRemain);
+
+
+(* -------- ADD MINUTES -------- *)
+
+wMin := wMin + AddMin;
+
+(* Minute rollover *)
+wHour := wHour + (wMin / 60);
+wMin  := wMin MOD 60;
+
+(* Hour rollover *)
+wDay  := wDay + (wHour / 24);
+wHour := wHour MOD 24;
+
+
+(* -------- DAY/MONTH/YEAR HANDLING -------- *)
+
+(* Simplified month length handling *)
+CASE wMonth OF
+    1,3,5,7,8,10,12:
+	WHILE wDay > 31 DO
+		wDay := wDay - 31;
+		wMonth := wMonth + 1;
+	END_WHILE;
+
+    4,6,9,11:
+	WHILE wDay > 30 DO
+		wDay := wDay - 30;
+		wMonth := wMonth + 1;
+	END_WHILE;
+
+    2:
+	(* No leap year handling – industrial simplification *)
+	WHILE wDay > 28 DO
+		wDay := wDay - 28;
+		wMonth := wMonth + 1;
+	END_WHILE;
+END_CASE;
+
+
+(* Month rollover *)
+WHILE wMonth > 12 DO
+    wMonth := wMonth - 12;
+    wYear := wYear + 1;
+END_WHILE;
+
+
+(* -------- OUTPUT --------
+   No struct anymore -- Comp_Year/Comp_Month/Comp_Day/Comp_Hour/Comp_Min
+   are all plain INT, assigned directly from the working scalars. *)
+Comp_Year  := wYear;
+Comp_Month := wMonth;
+Comp_Day   := wDay;
+Comp_Hour  := wHour;
+Comp_Min   := wMin;

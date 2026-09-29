@@ -1,37 +1,126 @@
-(* Pre-open delay with self-hold *)
-tPreDelay(IN := ((tPreDelay.Q OR X0) AND NOT X1 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1.5s);
+(* Consolidated Exit FB (backs ExitInst) — branches on UseCloser instead of
+   dispatching air/closer as two separate FB instances/CASE IDs.
+   VAR_INPUT UseCloser : BOOL; is assumed already declared (the manager already
+   calls ExitInst(UseCloser := HMI_UseCloser)).
+   NOTE: requires new locals in GX Works3's variable table (not shown in this
+   plain-text export):
+     closerOpenLatch, closerCloseLatch : BOOL;
+     mOpen, mClose, prevMClose         : BOOL;
+     exitDoneCond, cycleDoneEdge, prevCycleDone : BOOL;
+     exitTimeoutCond, exitTimeoutRise, prevExitTimeout : BOOL;
+     tCloserPreDelay, tCloserOpenHold, tCloserCloseHold : TON;
+     tAirPreDelay, tAirCloseHold : TON;
+     tCloserOpenTimeout, tAirOpenTimeout : TON;
+   and new VAR_OUTPUT: Pass_Pulse, Fail_Pulse : BOOL.
+   SR_ExitCloser.txt / ExitCloserInst are retired — this file now covers both
+   sequences; the manager's CASE ID 3 branch has been removed. *)
 
+IF UseCloser THEN
 
-(* OPEN -ends when tCloseHold duration ends *)
-IF (tPreDelay.Q AND X17 AND NOT mClose AND NOT X1 AND M4) THEN
-    mOpen := TRUE;
+    (* ---------------- Closer branch (from SR_ExitCloser.txt) ---------------- *)
+    tCloserPreDelay(IN := (X0 AND NOT X1 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1s);
+
+    tCloserOpenHold(IN := ((tCloserPreDelay.Q AND X17 AND NOT closerCloseLatch AND M4) OR closerOpenLatch), PT := T#400ms);
+
+    IF (tCloserOpenHold.Q AND M4) THEN
+        closerOpenLatch := TRUE;
+    ELSE
+        IF (NOT tCloserPreDelay.Q OR NOT M4 OR closerCloseLatch) THEN
+            closerOpenLatch := FALSE;
+        END_IF;
+    END_IF;
+
+    tCloserCloseHold(IN := ((closerOpenLatch AND X1 AND X17 AND NOT M1 AND M4) OR closerCloseLatch), PT := T#2.3s);
+
+    IF (tCloserCloseHold.Q AND M4) THEN
+        closerCloseLatch := TRUE;
+    ELSE
+        IF (NOT closerOpenLatch OR NOT M4) THEN
+            closerCloseLatch := FALSE;
+        END_IF;
+    END_IF;
+
+    Y1 := closerOpenLatch;
+    Y2 := closerCloseLatch;
+
+    exitDoneCond := (tCloserCloseHold.Q AND X17 AND M4);
+
+    (* ---------------- Closer Open Timeout Detection (fail path) ---------------- *)
+    (* closerOpenLatch (door reported open) self-holds once tCloserOpenHold
+       trips; tCloserCloseHold can't start without X1. If X1 never asserts
+       within this new 3s window after the open latch sets, the close
+       confirm sensor failed to respond -- treat as a failed cycle. *)
+    tCloserOpenTimeout(IN := (closerOpenLatch AND NOT X1 AND X17 AND M4), PT := T#3s);
+
+    exitTimeoutCond := tCloserOpenTimeout.Q;
+
 ELSE
-	mOpen := FALSE;
+
+    (* ---------------- Air branch (from SR_ExitAir.txt) ---------------- *)
+    tAirPreDelay(IN := ((tAirPreDelay.Q OR X0) AND NOT X1 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1.5s);
+
+    IF (tAirPreDelay.Q AND X17 AND NOT mClose AND NOT X1 AND M4) THEN
+        mOpen := TRUE;
+    ELSE
+        mOpen := FALSE;
+    END_IF;
+
+    tAirCloseHold(IN := X1, PT := T#750ms);
+
+    IF (tAirCloseHold.Q AND X17 AND M4) THEN
+        mClose := TRUE;
+    ELSE
+        mClose := FALSE;
+    END_IF;
+
+    Y1 := mOpen;
+    Y2 := mClose;
+
+    exitDoneCond := (mClose AND NOT prevMClose AND X17 AND M4);
+    prevMClose := mClose;
+
+    (* ---------------- Air Open Timeout Detection (fail path) ---------------- *)
+    (* mOpen is only ever driven true while NOT X1 holds (see its IF/ELSE
+       above), so it already encodes "commanded open, waiting on X1". If
+       mOpen stays commanded for a new 3s window without X1 ever asserting,
+       the close-confirm sensor failed to respond -- treat as a failed
+       cycle. tAirCloseHold itself can't detect this because its IN is X1
+       directly, so it can never even start running without X1 already true. *)
+    tAirOpenTimeout(IN := (mOpen AND NOT X1 AND X17 AND M4), PT := T#3s);
+
+    exitTimeoutCond := tAirOpenTimeout.Q;
+
 END_IF;
 
-tCloseHold(IN := X1, PT :=T#750ms);
 
-(* CLOSE (corrected: no coexistence & tied to tCloseHold *)
-IF (tCloseHold.Q AND X17 AND M4) THEN
-    mClose := TRUE;
-ELSE
-	mClose := FALSE;
-END_IF;
+(* ---------------- Shared cycle-complete / timeout / goal / pulses ---------------- *)
+cycleDoneEdge := exitDoneCond AND NOT prevCycleDone;
+prevCycleDone := exitDoneCond;
 
-(* Outputs *)
-Y1 := mOpen;
-Y2 := mClose;
+exitTimeoutRise := exitTimeoutCond AND NOT prevExitTimeout;
+prevExitTimeout := exitTimeoutCond;
 
-
-(* Cycle complete  *)
-IF (mClose AND NOT prevClose AND X17 AND M4) THEN
-    SET(M1);
+(* AND NOT exitTimeoutRise is a defensive interlock, not just a byproduct of
+   X1 timing: CycleCount must never increment on the same scan Fail_Pulse
+   does, so this is made explicit rather than relying on the two edge
+   conditions happening to be mutually exclusive today. *)
+IF cycleDoneEdge AND NOT exitTimeoutRise THEN
+    M1 := TRUE;
     CycleCount := CycleCount + 1;
+    Pass_Pulse := TRUE;
+ELSE
+    M1 := FALSE;
+    Pass_Pulse := FALSE;
 END_IF;
 
-PrevClose := mClose;
+IF exitTimeoutRise THEN
+    Fail_Pulse := TRUE;
+ELSE
+    Fail_Pulse := FALSE;
+END_IF;
 
-(* Goal reached *)
-IF (CycleCount >= CycleTarget) AND (CycleTarget > 0)THEN
+
+(* ---------------- Goal reached ---------------- *)
+IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
 END_IF;

@@ -1,5 +1,22 @@
+(* NOTE: requires new locals in GX Works3's variable table (not shown in this
+   plain-text export): cycleSamplePass, cycleSampleFail : BOOL;
+   cycleDoneEdge, prevCycleDone : BOOL;
+   and new VAR_OUTPUT: Pass_Pulse, Fail_Pulse : BOOL.
+
+   Fixes in this pass:
+   - Removed the "Heartbeat" block, which directly SET/RST device M3 — M3 is
+     the device backing the global EStop_Latch label, so this test was
+     silently stomping the e-stop latch every scan it ran. E-stop latching is
+     now solely the manager's job (UniTestManref.txt, per CLAUDE.md 5.2).
+   - Removed the direct FailtoRet increment and the orphaned/undeclared M5
+     fail-limit trip — the manager now owns fail counting via CycleFail_Pulse.
+   - The old code incremented CycleCount twice per cycle (once in the t5Rise
+     block, again in the Cycle Complete block). The t5Rise block now only
+     captures a one-scan pass/fail sample; CycleCount increments exactly once,
+     at Cycle Complete, using that sample to drive CyclePass_Pulse/CycleFail_Pulse. *)
+
 (* ---------------- Initial Start Delay ---------------- *)
-tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4 AND NOT M5), PT := T#1s);
+tStartDelay(IN := (X0 AND X17 AND NOT M1 AND NOT M2 AND M4), PT := T#1s);
 
 
 (* ---------------- Open Door 1 ---------------- *)
@@ -50,18 +67,18 @@ ELSE
 END_IF;
 
 
-(* ---------------- Rising edge detect T5 ---------------- *)
+(* ---------------- Rising edge detect T5 (pass/fail sample only) ---------------- *)
 t5Rise := (tOpen2.Q AND NOT prevT5);
 prevT5 := tOpen2.Q;
 
-
-(* ---------------- Counters ---------------- *)
-IF (t5Rise AND X17 AND NOT X0 AND M4) THEN
-    FailtoRet := FailtoRet + 1;
-END_IF;
-
-IF (t5Rise AND X17 AND X0 AND M4) THEN
-    CycleCount := CycleCount + 1;
+IF (t5Rise AND X17 AND M4) THEN
+    IF X0 THEN
+        cycleSamplePass := TRUE;
+        cycleSampleFail := FALSE;
+    ELSE
+        cycleSamplePass := FALSE;
+        cycleSampleFail := TRUE;
+    END_IF;
 END_IF;
 
 
@@ -82,28 +99,30 @@ Y1 := (M20 AND NOT M21) OR (M32 AND NOT M33);   (* Open door *)
 Y2 := (M21 AND NOT Y0) OR (M33 AND NOT M1);     (* Close door *)
 
 
-(* ---------------- Cycle Complete ---------------- *)
-IF (tClose2.Q AND X17 AND M4) THEN
-    SET(M1);
-    CycleCount := CycleCount + 1;
+(* ---------------- Cycle Complete (one-scan pulse, single CycleCount increment) ---------------- *)
+cycleDoneEdge := (tClose2.Q AND X17 AND M4) AND NOT prevCycleDone;
+prevCycleDone := (tClose2.Q AND X17 AND M4);
+
+(* CycleCount now counts successful cycles only -- it must never increment on
+   the same scan as Fail_Pulse, so the increment is gated on cycleSamplePass
+   specifically rather than on cycleDoneEdge alone. Previously this counted
+   every completed attempt (pass or fail); a failed cycle no longer advances
+   CycleCount/CycleTarget/Goal_Reached or CPM throughput. *)
+IF cycleDoneEdge THEN
+    M1 := TRUE;
+    Pass_Pulse := cycleSamplePass;
+    Fail_Pulse := cycleSampleFail;
+    IF cycleSamplePass THEN
+        CycleCount := CycleCount + 1;
+    END_IF;
+ELSE
+    M1 := FALSE;
+    Pass_Pulse := FALSE;
+    Fail_Pulse := FALSE;
 END_IF;
 
 
 (* ---------------- Goal Reached ---------------- *)
-IF (CycleCount > CycleTarget) AND (CycleTarget > 0) THEN
+IF (CycleCount >= CycleTarget) AND (CycleTarget > 0) THEN
     SET(M2);
-END_IF;
-
-
-(* ---------------- Fail Limit ---------------- *)
-IF (FailtoRet > 500) THEN
-    SET(M5);
-END_IF;
-
-
-(* ---------------- Heartbeat ---------------- *)
-IF (NOT X17 AND FX5CPU.stSM.b1sClock) THEN
-    SET(M3);
-ELSE
-    RST(M3);
 END_IF;
