@@ -6,6 +6,8 @@ Universal Test Manager (UniTestMan) is a reusable PLC/HMI framework for automate
 
 The system centralizes test execution, state management, operator interaction, diagnostics, and test analytics into a single architecture that supports multiple test types while maintaining a consistent technician experience.
 
+This system is currently in use at Allegion HRTC.
+
 **Technologies**
 
 - GX Works3 — PLC programming and control logic
